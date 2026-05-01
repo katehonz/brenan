@@ -192,6 +192,57 @@ app.post("/register", proc(ctx: Context) {.async.} =
 )
 ```
 
+## WebAssembly (WASM)
+
+Compile the reactive core to WebAssembly for high-performance signal computation in the browser, controlled from JavaScript:
+
+```nim
+# examples/wasm_reactive.nim
+import nimleptos/reactive/signal
+import nimleptos/reactive/effects
+
+let (count, setCount) = createSignal(0)
+let (doubled, _) = createMemo(proc(): int = count() * 2)
+
+{.push exportc.}
+proc increment() = setCount(count() + 1)
+proc decrement() = setCount(count() - 1)
+proc getCount(): int = count()
+proc getDoubled(): int = doubled()
+{.pop.}
+```
+
+Build with Emscripten:
+
+```bash
+# Ensure emcc is in PATH (source ~/emsdk/emsdk_env.sh)
+nimble wasm
+```
+
+Use from JavaScript:
+
+```javascript
+import initWasm from './wasm_reactive.js';
+const module = await initWasm();
+module._main();  // Initialize Nim globals
+
+module._increment();
+console.log(module._getCount());      // 1
+console.log(module._getDoubled());    // 2
+```
+
+Open `examples/wasm_reactive.html` in a browser to see the interactive demo.
+
+### WASM Architecture
+
+| Layer | Technology | Role |
+|-------|-----------|------|
+| Reactive Core | Nim → WASM (Emscripten) | Signals, effects, memos |
+| JS Bridge | Emscripten `EXPORTED_FUNCTIONS` | Call Nim procs from JS |
+| DOM | Plain JS / `std/dom` | Render and event handling |
+
+> **Note:** Avoid `echo` inside `createEffect` when compiling to WASM — it can block stdout and cause deadlock in the Emscripten runtime. Use JS-side logging instead.
+
 ## WebSocket Realtime
 
 ```nim
@@ -261,6 +312,9 @@ nimble timer
 
 # Hybrid buildHtml + reactive DOM (nim js)
 nimble hybrid
+
+# Reactive core to WASM (requires Emscripten)
+nimble wasm
 ```
 
 ## Comparison with Leptos (Rust)
@@ -271,7 +325,7 @@ nimble hybrid
 | Reactivity | Signals | Signals (same model) |
 | Rendering | Virtual DOM / SSR | HtmlNode tree / SSR |
 | Backend | Actix/Axum | NimMax |
-| Compilation | WASM + Native | Native (server) + JS (client) |
+| Compilation | WASM + Native | Native (server) + JS (client) + WASM (core) |
 | Macros | `view!` | `elDiv()`, `text()` builders |
 | Hydration | WASM-based | `nim js` + `data-nl-id` |
 

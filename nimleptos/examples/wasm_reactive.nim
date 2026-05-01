@@ -1,8 +1,14 @@
 ## NimLeptos Reactive Core in WebAssembly
 ## Signals + Effects compiled to WASM, controlled from JavaScript.
 ##
+## Prerequisites:
+##   - Emscripten SDK (https://emscripten.org/docs/getting_started/downloads.html)
+##
 ## Build:
-##   source ~/emsdk/emsdk_env.sh
+##   source ~/emsdk/emsdk_env.sh   # or ensure emcc is in PATH
+##   nimble wasm
+##
+## Or manually:
 ##   nim c --cpu:wasm32 --mm:arc -p:src \
 ##     --cc:clang --clang.exe:emcc --clang.linkerexe:emcc \
 ##     --passC:"-sWASM=1" \
@@ -18,15 +24,18 @@ import nimleptos/reactive/effects
 let (count, setCount) = createSignal(0)
 let (doubled, _) = createMemo(proc(): int = count() * 2)
 
-# Exported functions called from JS via Module.ccall/_func
-proc increment() {.exportc.} =
+{.push exportc.}
+
+proc increment() =
   setCount(count() + 1)
 
-proc decrement() {.exportc.} =
+proc decrement() =
   setCount(count() - 1)
 
-proc getCount(): int {.exportc.} =
-  return count()
+proc getCount(): int =
+  count()
 
-proc getDoubled(): int {.exportc.} =
-  return doubled()
+proc getDoubled(): int =
+  doubled()
+
+{.pop.}

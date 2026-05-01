@@ -9,6 +9,8 @@ srcDir        = "src"
 requires "nim >= 2.0.0"
 requires "nimmax >= 1.0.0"
 
+import os
+
 task test, "Run all tests":
   exec "nim c -r --threads:on -p:src tests/signal_test.nim"
   exec "nim c -r --threads:on -p:src tests/macros_test.nim"
@@ -34,7 +36,19 @@ task conditional, "Compile reactive if/else example":
   exec "nim js -p:src -o:examples/conditional_client.js examples/conditional_client.nim"
 
 task wasm, "Compile reactive core to WASM":
-  let emcc = "/home/ziko/emsdk/upstream/emscripten/emcc"
+  var emcc = findExe("emcc")
+  if emcc == "":
+    let emsdk = getEnv("EMSDK")
+    if emsdk != "":
+      emcc = emsdk / "upstream" / "emscripten" / "emcc"
+    else:
+      let home = getEnv("HOME")
+      let candidate = home / "emsdk" / "upstream" / "emscripten" / "emcc"
+      if fileExists(candidate):
+        emcc = candidate
+      else:
+        echo "Error: emcc not found. Install Emscripten (https://emscripten.org) and ensure it's in your PATH, set EMSDK env var, or install to ~/emsdk."
+        quit(1)
   exec "nim c --cpu:wasm32 --mm:arc -p:src " &
     "--cc:clang --clang.exe:" & emcc & " --clang.linkerexe:" & emcc & " " &
     "--passC:\"-sWASM=1\" " &
