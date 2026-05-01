@@ -8,6 +8,7 @@ type
     children*: seq[HtmlNode]
     text*: string
     isText*: bool
+    reactiveText*: proc(): string {.closure.}  ## If set, this text node auto-updates in the browser
 
 proc escapeHtml*(s: string): string =
   result = s
@@ -18,6 +19,11 @@ proc escapeHtml*(s: string): string =
 
 proc textNode*(content: string): HtmlNode =
   HtmlNode(text: content, isText: true)
+
+proc reactiveTextNode*(content: string, getter: proc(): string {.closure.}): HtmlNode =
+  ## Create a text node with reactive binding for CSR.
+  ## The getter is called automatically when the node is rendered to DOM via `renderDomNode`.
+  HtmlNode(text: content, isText: true, reactiveText: getter)
 
 proc elementNode*(tag: string): HtmlNode =
   HtmlNode(tag: tag, isText: false)

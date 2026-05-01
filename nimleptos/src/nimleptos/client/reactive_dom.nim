@@ -7,16 +7,6 @@ when defined(js):
   import ./dom_interop
   import ./event_handlers
 
-  proc renderDomNode*(node: HtmlNode): DomElement =
-    ## Convert HtmlNode tree to real DOM elements
-    if node.isText:
-      return createTextNode(node.text)
-    result = createElement(node.tag)
-    for (key, value) in node.attributes:
-      result.setAttribute(key, value)
-    for child in node.children:
-      result.appendChild(renderDomNode(child))
-
   proc reactiveTextNode*(getter: Getter[string]): DomElement =
     ## Create a text node that automatically updates when the signal changes.
     ## Usage:
@@ -28,6 +18,19 @@ when defined(js):
       setTextContent(textNode, getter())
     )
     return textNode
+
+  proc renderDomNode*(node: HtmlNode): DomElement =
+    ## Convert HtmlNode tree to real DOM elements.
+    ## If a text node has `reactiveText`, it becomes a live-updating text node.
+    if node.isText:
+      if node.reactiveText != nil:
+        return reactiveTextNode(node.reactiveText)
+      return createTextNode(node.text)
+    result = createElement(node.tag)
+    for (key, value) in node.attributes:
+      result.setAttribute(key, value)
+    for child in node.children:
+      result.appendChild(renderDomNode(child))
 
   proc reactiveAttr*(el: DomElement, name: string, getter: Getter[string]) =
     ## Bind a DOM attribute to a signal so it updates automatically.
@@ -55,16 +58,21 @@ when defined(js):
     while el.firstChild != nil:
       el.removeChild(el.firstChild)
 
-  proc mountApp*(selector: string, builder: proc(): HtmlNode) =
+  proc mountApp*(selector: string, builder: proc(): HtmlNode,
+      afterMount: proc(root: DomElement) = nil) =
     ## Mount a NimLeptos app to a DOM element (client-side rendering).
     ## Clears the target element and renders the app inside it.
-    let root = querySelector(selector)
-    if root == nil:
+    ## Optional `afterMount` callback receives the rendered root DomElement.
+    let mountRoot = querySelector(selector)
+    if mountRoot == nil:
       echo "mountApp: selector not found: " & selector
       return
-    clearChildren(root)
+    clearChildren(mountRoot)
     let node = builder()
-    root.appendChild(renderDomNode(node))
+    let root = renderDomNode(node)
+    mountRoot.appendChild(root)
+    if afterMount != nil:
+      afterMount(root)
     initEventHandlers()
 
   proc mountReactiveApp*(selector: string, builder: proc(): seq[DomElement]) =
@@ -101,7 +109,8 @@ else:
   proc clearChildren*(el: DomElement) =
     discard
 
-  proc mountApp*(selector: string, builder: proc(): HtmlNode) =
+  proc mountApp*(selector: string, builder: proc(): HtmlNode,
+      afterMount: proc(root: DomElement) = nil) =
     discard
 
   proc mountReactiveApp*(selector: string, builder: proc(): seq[DomElement]) =

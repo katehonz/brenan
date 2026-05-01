@@ -6,6 +6,39 @@ export node
 proc buildTextNode(text: string): NimNode =
   newCall("textNode", newStrLitNode(text))
 
+proc buildReactiveTextNode(expr: NimNode): NimNode =
+  ## For non-string-literal text expressions, generate:
+  ##   when defined(js):
+  ##     reactiveTextNode($expr, proc(): string = $expr)
+  ##   else:
+  ##     textNode($expr)
+  let strExpr = newCall("$", expr)
+
+  # Build lambda: proc(): string = $expr
+  let getterProc = newNimNode(nnkLambda)
+  getterProc.add(newEmptyNode())  # name
+  getterProc.add(newEmptyNode())  # generics
+  getterProc.add(newEmptyNode())  # pragmas
+  let formalParams = newNimNode(nnkFormalParams)
+  formalParams.add(ident("string"))  # return type
+  getterProc.add(formalParams)
+  getterProc.add(newEmptyNode())  # reserved
+  getterProc.add(newEmptyNode())  # reserved
+  getterProc.add(newStmtList(strExpr))  # body
+
+  let reactiveCode = newCall("reactiveTextNode", strExpr, getterProc)
+  let staticCode = newCall("textNode", strExpr)
+
+  result = newNimNode(nnkWhenStmt)
+  let definedJs = newCall("defined", ident("js"))
+  let jsBranch = newNimNode(nnkElifBranch)
+  jsBranch.add(definedJs)
+  jsBranch.add(reactiveCode)
+  let elseBranch = newNimNode(nnkElse)
+  elseBranch.add(staticCode)
+  result.add(jsBranch)
+  result.add(elseBranch)
+
 proc buildElementCall(tag: string, attrs: seq[(string, string)],
     children: seq[NimNode]): NimNode =
   result = newNimNode(nnkStmtList)
@@ -37,14 +70,14 @@ proc extractAttrsAndBody(body: NimNode): tuple[attrs: seq[(string, string)], chi
         if child[1].kind == nnkStrLit:
           result.children.add(buildTextNode($child[1]))
         else:
-          result.children.add(newCall("textNode", child[1]))
+          result.children.add(buildReactiveTextNode(child[1]))
     of nnkCall:
       let callee = $child[0]
       if callee == "text" and child.len >= 2:
         if child[1].kind == nnkStrLit:
           result.children.add(buildTextNode($child[1]))
         else:
-          result.children.add(newCall("textNode", child[1]))
+          result.children.add(buildReactiveTextNode(child[1]))
         continue
 
       var tagName: string

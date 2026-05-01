@@ -1,5 +1,7 @@
-## Hybrid CSR Demo: buildHtml + reactive DOM binding
-## This shows how static structure (buildHtml) mixes with fine-grained reactivity.
+## Fully Automatic Reactive Counter
+## The buildHtml macro auto-wraps non-string text() in reactiveTextNode()
+## when compiled with nim js.
+##
 ## Compile: nim js -p:src -o:examples/hybrid_client.js examples/hybrid_client.nim
 
 import std/dom
@@ -10,49 +12,38 @@ import nimleptos/reactive/signal
 import nimleptos/reactive/effects
 
 when defined(js):
-  proc hybridApp(): seq[DomElement] =
-    let (count, setCount) = createSignal(0)
+  # Signals at module level so both builder and afterMount can use them
+  let (count, setCount) = createSignal(0)
 
-    # 1. Build static structure with the macro DSL
-    let staticNode = buildHtml:
+  proc hybridApp(): HtmlNode =
+    # MAGIC: text($count()) is automatically reactive when compiled with nim js!
+    # The macro generates: when defined(js): reactiveTextNode(...) else: textNode(...)
+    result = buildHtml:
       el("div", class="app"):
-        el("h1"): text("Hybrid Counter")
-        el("p", id="display", class="display"): text("Count: 0")
+        el("h1"): text("Auto-Reactive Counter")
+        el("p", class="display"): text("Count: " & $count())
         el("div", class="bar-container"):
-          el("div", id="bar", class="bar")
+          el("div", class="bar"): text("")
         el("div", class="buttons"):
-          el("button", id="btn-dec", class="btn"): text("-")
-          el("button", id="btn-inc", class="btn"): text("+")
+          el("button", class="btn btn-dec"): text("-")
+          el("button", class="btn btn-inc"): text("+")
 
-    # 2. Render HtmlNode tree to real DOM
-    let root = renderDomNode(staticNode)
+  proc afterMount(root: DomElement) =
+    # Bind buttons
+    let btnDec = querySelector(root, ".btn-dec")
+    if btnDec != nil:
+      btnDec.addEventListener("click", proc(e: Event) = setCount(count() - 1))
 
-    # 3. Find elements inside the rendered tree and attach REACTIVITY
-    #    This is the magic: createEffect runs automatically when signals change,
-    #    updating ONLY the changed DOM node. No virtual DOM. No re-render.
+    let btnInc = querySelector(root, ".btn-inc")
+    if btnInc != nil:
+      btnInc.addEventListener("click", proc(e: Event) = setCount(count() + 1))
 
-    let displayEl = querySelector(root, "#display")
-    clearChildren(displayEl)
-    displayEl.appendChild(
-      reactiveTextNode(proc(): string = "Count: " & $count())
-    )
+    # Reactive bar width
+    let bar = querySelector(root, ".bar")
+    if bar != nil:
+      reactiveStyle(bar, "width", proc(): string =
+        let pct = min(count() * 10, 100)
+        $pct & "%"
+      )
 
-    let barEl = querySelector(root, "#bar")
-    reactiveStyle(barEl, "width", proc(): string =
-      let pct = min(count() * 10, 100)
-      $pct & "%"
-    )
-
-    let btnDec = querySelector(root, "#btn-dec")
-    btnDec.addEventListener("click", proc(e: Event) =
-      setCount(count() - 1)
-    )
-
-    let btnInc = querySelector(root, "#btn-inc")
-    btnInc.addEventListener("click", proc(e: Event) =
-      setCount(count() + 1)
-    )
-
-    return @[root]
-
-  mountReactiveApp("#app", hybridApp)
+  mountApp("#app", hybridApp, afterMount)
