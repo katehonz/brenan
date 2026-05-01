@@ -19,19 +19,6 @@ when defined(js):
     )
     return textNode
 
-  proc renderDomNode*(node: HtmlNode): DomElement =
-    ## Convert HtmlNode tree to real DOM elements.
-    ## If a text node has `reactiveText`, it becomes a live-updating text node.
-    if node.isText:
-      if node.reactiveText != nil:
-        return reactiveTextNode(node.reactiveText)
-      return createTextNode(node.text)
-    result = createElement(node.tag)
-    for (key, value) in node.attributes:
-      result.setAttribute(key, value)
-    for child in node.children:
-      result.appendChild(renderDomNode(child))
-
   proc reactiveAttr*(el: DomElement, name: string, getter: Getter[string]) =
     ## Bind a DOM attribute to a signal so it updates automatically.
     el.setAttribute(name, getter())
@@ -52,6 +39,22 @@ when defined(js):
     discard createEffect(proc() =
       setStyle(el, prop, getter())
     )
+
+  proc renderDomNode*(node: HtmlNode): DomElement =
+    ## Convert HtmlNode tree to real DOM elements.
+    ## If a text node has `reactiveText`, it becomes a live-updating text node.
+    ## If an element has `reactiveAttrs`, they are bound to the DOM element.
+    if node.isText:
+      if node.reactiveText != nil:
+        return reactiveTextNode(node.reactiveText)
+      return createTextNode(node.text)
+    result = createElement(node.tag)
+    for (key, value) in node.attributes:
+      result.setAttribute(key, value)
+    for (name, getter) in node.reactiveAttrs:
+      reactiveAttr(result, name, getter)
+    for child in node.children:
+      result.appendChild(renderDomNode(child))
 
   proc clearChildren*(el: DomElement) =
     ## Remove all child nodes from an element.

@@ -1,7 +1,5 @@
 ## Fully Automatic Reactive Counter
-## The buildHtml macro auto-wraps non-string text() in reactiveTextNode()
-## when compiled with nim js.
-##
+## The buildHtml macro auto-detects reactive expressions in BOTH text() and attributes!
 ## Compile: nim js -p:src -o:examples/hybrid_client.js examples/hybrid_client.nim
 
 import std/dom
@@ -14,16 +12,17 @@ import nimleptos/reactive/effects
 when defined(js):
   # Signals at module level so both builder and afterMount can use them
   let (count, setCount) = createSignal(0)
+  let (active, setActive) = createSignal(true)
 
   proc hybridApp(): HtmlNode =
-    # MAGIC: text($count()) is automatically reactive when compiled with nim js!
-    # The macro generates: when defined(js): reactiveTextNode(...) else: textNode(...)
+    # MAGIC: Both text($count()) and class=$active() are automatically reactive!
+    # The macro generates when defined(js): reactiveTextNode/reactiveAttr
     result = buildHtml:
       el("div", class="app"):
         el("h1"): text("Auto-Reactive Counter")
-        el("p", class="display"): text("Count: " & $count())
+        el("p", class=$active()): text($count())
         el("div", class="bar-container"):
-          el("div", class="bar"): text("")
+          el("div", class=$active()): text("")
         el("div", class="buttons"):
           el("button", class="btn btn-dec"): text("-")
           el("button", class="btn btn-inc"): text("+")
@@ -38,12 +37,9 @@ when defined(js):
     if btnInc != nil:
       btnInc.addEventListener("click", proc(e: Event) = setCount(count() + 1))
 
-    # Reactive bar width
-    let bar = querySelector(root, ".bar")
-    if bar != nil:
-      reactiveStyle(bar, "width", proc(): string =
-        let pct = min(count() * 10, 100)
-        $pct & "%"
-      )
+    # Toggle active state every 5 clicks (just for demo)
+    let display = querySelector(root, "p")
+    if display != nil:
+      display.addEventListener("click", proc(e: Event) = setActive(not active()))
 
   mountApp("#app", hybridApp, afterMount)

@@ -1,4 +1,5 @@
 import std/macros
+import std/strutils
 import ../dom/node
 
 export node
@@ -13,18 +14,16 @@ proc buildReactiveTextNode(expr: NimNode): NimNode =
   ##   else:
   ##     textNode($expr)
   let strExpr = newCall("$", expr)
-
-  # Build lambda: proc(): string = $expr
   let getterProc = newNimNode(nnkLambda)
-  getterProc.add(newEmptyNode())  # name
-  getterProc.add(newEmptyNode())  # generics
-  getterProc.add(newEmptyNode())  # pragmas
+  getterProc.add(newEmptyNode())
+  getterProc.add(newEmptyNode())
+  getterProc.add(newEmptyNode())
   let formalParams = newNimNode(nnkFormalParams)
-  formalParams.add(ident("string"))  # return type
+  formalParams.add(ident("string"))
   getterProc.add(formalParams)
-  getterProc.add(newEmptyNode())  # reserved
-  getterProc.add(newEmptyNode())  # reserved
-  getterProc.add(newStmtList(strExpr))  # body
+  getterProc.add(newEmptyNode())
+  getterProc.add(newEmptyNode())
+  getterProc.add(newStmtList(strExpr))
 
   let reactiveCode = newCall("reactiveTextNode", strExpr, getterProc)
   let staticCode = newCall("textNode", strExpr)
@@ -39,23 +38,58 @@ proc buildReactiveTextNode(expr: NimNode): NimNode =
   result.add(jsBranch)
   result.add(elseBranch)
 
-proc buildElementCall(tag: string, attrs: seq[(string, string)],
-    children: seq[NimNode]): NimNode =
+proc buildReactiveAttr(nodeVar: NimNode, name: string, expr: NimNode): NimNode =
+  ## Generate:
+  ##   when defined(js):
+  ##     addReactiveAttr(node, "name", proc(): string = $expr)
+  ##   else:
+  ##     addAttribute(node, "name", $expr)
+  let strExpr = newCall("$", expr)
+  let getterProc = newNimNode(nnkLambda)
+  getterProc.add(newEmptyNode())
+  getterProc.add(newEmptyNode())
+  getterProc.add(newEmptyNode())
+  let formalParams = newNimNode(nnkFormalParams)
+  formalParams.add(ident("string"))
+  getterProc.add(formalParams)
+  getterProc.add(newEmptyNode())
+  getterProc.add(newEmptyNode())
+  getterProc.add(newStmtList(strExpr))
+
+  let reactiveCode = newCall("addReactiveAttr", nodeVar, newStrLitNode(name), getterProc)
+  let staticCode = newCall("addAttribute", nodeVar, newStrLitNode(name), strExpr)
+
+  result = newNimNode(nnkWhenStmt)
+  let definedJs = newCall("defined", ident("js"))
+  let jsBranch = newNimNode(nnkElifBranch)
+  jsBranch.add(definedJs)
+  jsBranch.add(reactiveCode)
+  let elseBranch = newNimNode(nnkElse)
+  elseBranch.add(staticCode)
+  result.add(jsBranch)
+  result.add(elseBranch)
+
+proc buildElementCall(tag: string, staticAttrs: seq[(string, string)],
+    reactiveAttrExprs: seq[(string, NimNode)], children: seq[NimNode]): NimNode =
   result = newNimNode(nnkStmtList)
   let nodeVar = genSym(nskLet, "node")
   result.add(newLetStmt(nodeVar, newCall("elementNode", newStrLitNode(tag))))
 
-  for (key, value) in attrs:
+  for (key, value) in staticAttrs:
     result.add(newCall("addAttribute", nodeVar, newStrLitNode(key),
         newStrLitNode(value)))
+
+  for (name, expr) in reactiveAttrExprs:
+    result.add(buildReactiveAttr(nodeVar, name, expr))
 
   for child in children:
     result.add(newCall("addChild", nodeVar, child))
 
   result.add(nodeVar)
 
-proc extractAttrsAndBody(body: NimNode): tuple[attrs: seq[(string, string)], children: seq[NimNode]] =
-  result.attrs = @[]
+proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)], reactiveAttrs: seq[(string, NimNode)], children: seq[NimNode]] =
+  result.staticAttrs = @[]
+  result.reactiveAttrs = @[]
   result.children = @[]
 
   if body == nil:
@@ -81,30 +115,49 @@ proc extractAttrsAndBody(body: NimNode): tuple[attrs: seq[(string, string)], chi
         continue
 
       var tagName: string
-      var attrs: seq[(string, string)] = @[]
+      var staticAttrs: seq[(string, string)] = @[]
+      var reactiveAttrs: seq[(string, NimNode)] = @[]
       var nestedBody: NimNode = nil
 
       if callee == "el" and child.len >= 2 and child[1].kind == nnkStrLit:
         tagName = $child[1]
         for i in 2 ..< child.len:
           let arg = child[i]
-          if arg.kind == nnkExprEqExpr and arg[0].kind == nnkIdent and arg[1].kind == nnkStrLit:
-            attrs.add(($arg[0], $arg[1]))
+          if arg.kind == nnkExprEqExpr and arg[0].kind == nnkIdent:
+            if arg[1].kind == nnkStrLit:
+              staticAttrs.add(($arg[0], $arg[1]))
+            else:
+              reactiveAttrs.add(($arg[0], arg[1]))
+          elif arg.kind == nnkInfix and arg.len == 3 and ($arg[0]).startsWith("=") and arg[1].kind == nnkIdent:
+            if arg[2].kind == nnkStrLit:
+              staticAttrs.add(($arg[1], $arg[2]))
+            else:
+              reactiveAttrs.add(($arg[1], arg[2]))
           elif arg.kind == nnkStmtList:
             nestedBody = arg
       else:
         tagName = callee
         for i in 1 ..< child.len:
           let arg = child[i]
-          if arg.kind == nnkExprEqExpr and arg[0].kind == nnkIdent and arg[1].kind == nnkStrLit:
-            attrs.add(($arg[0], $arg[1]))
+          if arg.kind == nnkExprEqExpr and arg[0].kind == nnkIdent:
+            if arg[1].kind == nnkStrLit:
+              staticAttrs.add(($arg[0], $arg[1]))
+            else:
+              reactiveAttrs.add(($arg[0], arg[1]))
+          elif arg.kind == nnkInfix and arg.len == 3 and ($arg[0]).startsWith("=") and arg[1].kind == nnkIdent:
+            if arg[2].kind == nnkStrLit:
+              staticAttrs.add(($arg[1], $arg[2]))
+            else:
+              reactiveAttrs.add(($arg[1], arg[2]))
           elif arg.kind == nnkStmtList:
             nestedBody = arg
 
-      let (nestedAttrs, nestedChildren) = extractAttrsAndBody(nestedBody)
-      for a in nestedAttrs:
-        attrs.add(a)
-      result.children.add(buildElementCall(tagName, attrs, nestedChildren))
+      let (nestedStaticAttrs, nestedReactiveAttrs, nestedChildren) = extractAttrsAndBody(nestedBody)
+      for a in nestedStaticAttrs:
+        staticAttrs.add(a)
+      for a in nestedReactiveAttrs:
+        reactiveAttrs.add(a)
+      result.children.add(buildElementCall(tagName, staticAttrs, reactiveAttrs, nestedChildren))
     of nnkInfix:
       if child.len == 3 and $child[0] == "&":
         result.children.add(newCall("textNode", child))
@@ -116,46 +169,53 @@ proc extractAttrsAndBody(body: NimNode): tuple[attrs: seq[(string, string)], chi
       result.children.add(newCall("textNode", newCall("$", child)))
 
 macro html*(body: untyped): untyped =
-  let (attrs, children) = extractAttrsAndBody(body)
+  let (staticAttrs, reactiveAttrs, children) = extractAttrsAndBody(body)
   if children.len == 1:
     result = children[0]
   elif children.len > 1:
-    result = buildElementCall("div", attrs, children)
+    result = buildElementCall("div", staticAttrs, reactiveAttrs, children)
   else:
     result = newCall("elementNode", newStrLitNode("div"))
 
 macro buildHtml*(body: untyped): untyped =
   ## Build an HtmlNode tree from a DSL.
-  ## Usage:
-  ##   let node = buildHtml:
-  ##     el("div", class="app"):
-  ##       el("h1"): text("Title")
-  ##       el("p"): text("Hello")
-  let (attrs, children) = extractAttrsAndBody(body)
+  ## Automatically detects reactive expressions in text() and attributes
+  ## and generates reactiveTextNode / addReactiveAttr when compiled with nim js.
+  let (staticAttrs, reactiveAttrs, children) = extractAttrsAndBody(body)
   if children.len == 1:
     result = children[0]
   elif children.len > 1:
-    result = buildElementCall("div", attrs, children)
+    result = buildElementCall("div", staticAttrs, reactiveAttrs, children)
   else:
     result = newCall("elementNode", newStrLitNode("div"))
 
 macro el*(args: varargs[untyped]): untyped =
   ## Create an HTML element. First arg is tag name, rest are attrs or body.
+  ## Attributes with non-string-literal values become reactive when compiled with nim js.
   ## Usage:
   ##   el("div", class="app", id="main"):
   ##     text("Hello")
   if args.len == 0:
     error("el macro requires at least a tag name")
   let tag = $args[0]
-  var attrs: seq[(string, string)] = @[]
+  var staticAttrs: seq[(string, string)] = @[]
+  var reactiveAttrs: seq[(string, NimNode)] = @[]
   var body: NimNode = nil
 
   for i in 1 ..< args.len:
     let arg = args[i]
-    if arg.kind == nnkExprEqExpr and arg[0].kind == nnkIdent and arg[1].kind == nnkStrLit:
-      attrs.add(($arg[0], $arg[1]))
+    if arg.kind == nnkExprEqExpr and arg[0].kind == nnkIdent:
+      if arg[1].kind == nnkStrLit:
+        staticAttrs.add(($arg[0], $arg[1]))
+      else:
+        reactiveAttrs.add(($arg[0], arg[1]))
+    elif arg.kind == nnkInfix and arg.len == 3 and ($arg[0]).startsWith("=") and arg[1].kind == nnkIdent:
+      if arg[2].kind == nnkStrLit:
+        staticAttrs.add(($arg[1], $arg[2]))
+      else:
+        reactiveAttrs.add(($arg[1], arg[2]))
     elif arg.kind == nnkStmtList:
       body = arg
 
-  let (_, children) = extractAttrsAndBody(body)
-  result = buildElementCall(tag, attrs, children)
+  let (_, _, children) = extractAttrsAndBody(body)
+  result = buildElementCall(tag, staticAttrs, reactiveAttrs, children)

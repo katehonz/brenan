@@ -1,6 +1,8 @@
 import std/strutils
 
 type
+  ReactiveAttr* = tuple[name: string, getter: proc(): string {.closure.}]
+
   HtmlNode* = ref object
     tag*: string
     attributes*: seq[(string, string)]
@@ -9,6 +11,7 @@ type
     text*: string
     isText*: bool
     reactiveText*: proc(): string {.closure.}  ## If set, this text node auto-updates in the browser
+    reactiveAttrs*: seq[ReactiveAttr]  ## Attributes that auto-update in the browser
 
 proc escapeHtml*(s: string): string =
   result = s
@@ -30,6 +33,11 @@ proc elementNode*(tag: string): HtmlNode =
 
 proc addAttribute*(node: HtmlNode, key: string, value: string) =
   node.attributes.add((key, value))
+
+proc addReactiveAttr*(node: HtmlNode, name: string, getter: proc(): string {.closure.}) =
+  ## Add an attribute that automatically updates when the signal changes.
+  ## Used by the buildHtml macro for reactive attribute interpolation.
+  node.reactiveAttrs.add((name, getter))
 
 proc addEvent*(node: HtmlNode, event: string, handlerId: string) =
   node.events.add((event, handlerId))

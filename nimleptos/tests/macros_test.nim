@@ -75,6 +75,17 @@ proc testElMacro() =
   doAssert html.contains("<h2>Article</h2>")
   echo "PASS: el macro"
 
+proc testReactiveAttrMacro() =
+  let active = true
+  let node = buildHtml:
+    el("div", class=$active):
+      el("span", id="test"): text("hello")
+  let html = renderToHtml(node)
+  # On native backend, reactive attrs evaluate to static values
+  doAssert html.contains("<div class=\"true\">")
+  doAssert html.contains("<span id=\"test\">hello</span>")
+  echo "PASS: reactive attr macro (native fallback)"
+
 when isMainModule:
   testTextNode()
   testElementNode()
@@ -85,5 +96,6 @@ when isMainModule:
   testRenderToHtmlRaw()
   testBuildHtmlMacro()
   testElMacro()
+  testReactiveAttrMacro()
   echo ""
   echo "All HTML DSL tests passed!"
