@@ -177,6 +177,58 @@ nimble conditional # reactive if/else
 
 ---
 
+## HTTP Client
+
+JSON fetch wrapper for calling REST APIs from the browser:
+
+```nim
+import nimleptos/client/http_client
+
+fetchGetJson("/api/posts", proc(data: JsonNode) =
+  echo data["posts"].len
+)
+
+fetchPostJson("/api/posts", """{"title":"Hello"}""", proc(data: JsonNode) =
+  echo data["id"]
+)
+```
+
+| Proc | Description |
+|------|-------------|
+| `fetchGetJson(url, onSuccess, onError)` | GET request, parse JSON response |
+| `fetchPostJson(url, body, onSuccess, onError)` | POST request with JSON body |
+
+## Client-Side Router
+
+Hash-based router for SPAs (no page reloads):
+
+```nim
+import nimleptos/client/router
+
+# Initialize once
+initHashRouter()
+
+# Read current route
+let route = hashRoute()()  # e.g. "/" or "/post/5"
+
+# Navigate programmatically
+navigate("#/post/5")
+
+# Use inside buildHtml for conditional rendering
+buildHtml:
+  if hashRoute()() == "/":
+    el("div"): text("Home")
+  else:
+    el("div"): text("Other page")
+```
+
+| Proc | Description |
+|------|-------------|
+| `initHashRouter()` | Start listening for `hashchange` events |
+| `hashRoute()` | Returns reactive `Getter[string]` for current route |
+| `navigate(path)` | Change `window.location.hash` |
+| `routeParam(route, prefix)` | Extract param after prefix (e.g. `routeParam("/post/5", "/post/") == "5"`) |
+
 ## Progressive Enhancement
 
 Pages work without JavaScript (server-rendered HTML submits normally) and gain interactivity when JS loads. The hydration system marks SSR-rendered nodes with `data-nl-id` and `data-nl-hydrated` attributes.

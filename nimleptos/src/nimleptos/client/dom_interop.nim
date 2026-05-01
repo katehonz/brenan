@@ -47,11 +47,14 @@ when defined(js):
   proc createTextNode*(text: string): DomElement =
     cast[DomElement](document.createTextNode(cstring(text)))
 
+  proc stdAppendChild(parent, child: Node): Node {.importcpp: "#.appendChild(#)".}
+  proc stdRemoveChild(parent, child: Node): Node {.importcpp: "#.removeChild(#)".}
+
   proc appendChild*(parent, child: DomElement) =
-    parent.appendChild(child)
+    discard stdAppendChild(parent, child)
 
   proc removeChild*(parent, child: DomElement) =
-    parent.removeChild(child)
+    discard stdRemoveChild(parent, child)
 
   proc setStyle*(el: DomElement, prop: string, value: string) =
     el.style.setProperty(cstring(prop), cstring(value))

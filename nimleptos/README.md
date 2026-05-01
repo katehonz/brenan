@@ -332,6 +332,9 @@ nimble hybrid
 # Reactive if/else conditional (nim js)
 nimble conditional
 
+# Blog App (CSR + REST API + client router)
+nimble blog
+
 # Full-stack Todo App (SSR + forms + validation)
 nimble todo
 

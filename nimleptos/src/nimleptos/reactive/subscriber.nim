@@ -57,11 +57,13 @@ proc trackDependencies*(comp: Computation) =
   currentComputation = prev
 
 proc flush*(sched: Scheduler) =
+  echo "flush called, queue len=" & $sched.queue.len
   while sched.queue.len > 0:
     let batch = sched.queue
     sched.queue.setLen(0)
     for comp in batch:
       if comp.dirty:
+        echo "flushing computation"
         trackDependencies(comp)
   sched.pending = false
 
@@ -73,7 +75,10 @@ proc schedule*(sched: Scheduler, comp: Computation) =
     flush(sched)
 
 proc notify*(signal: SignalBase) =
-  for sub in signal.subscribers:
+  echo "notify called, subscribers=" & $signal.subscribers.len
+  let subs = signal.subscribers  # snapshot: cleanup/addDependency mutate the list during flush
+  for sub in subs:
+    echo "  sub is Computation=" & $(sub of Computation)
     sub.dirty = true
     if sub.onNotify != nil:
       sub.onNotify()
@@ -94,6 +99,7 @@ proc batch*(fn: proc() {.closure.}) =
 
 proc addDependency*(signal: SignalBase) =
   if currentComputation != nil:
+    echo "addDependency: adding comp to signal subscribers"
     signal.subscribe(currentComputation)
     if signal notin currentComputation.dependencies:
       currentComputation.dependencies.add(signal)

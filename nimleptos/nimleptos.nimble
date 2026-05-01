@@ -38,6 +38,10 @@ task conditional, "Compile reactive if/else example":
 task todo, "Run full-stack todo app example":
   exec "nim c -r --threads:on -p:src examples/todo_app.nim"
 
+task blog, "Build and run blog example":
+  exec "nim js -p:src -o:examples/blog/public/app.js examples/blog/frontend.nim"
+  exec "nim c -r --threads:on -p:src examples/blog/backend.nim"
+
 task wasm, "Compile reactive core to WASM":
   var emcc = findExe("emcc")
   if emcc == "":
