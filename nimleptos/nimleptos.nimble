@@ -29,3 +29,6 @@ task timer, "Compile reactive timer example":
 
 task hybrid, "Compile hybrid buildHtml + reactive DOM example":
   exec "nim js -p:src -o:examples/hybrid_client.js examples/hybrid_client.nim"
+
+task conditional, "Compile reactive if/else example":
+  exec "nim js -p:src -o:examples/conditional_client.js examples/conditional_client.nim"

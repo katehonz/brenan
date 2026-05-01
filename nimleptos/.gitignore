@@ -8,6 +8,7 @@ nimleptos/examples/counter/main
 nimleptos/examples/counter_client.js
 nimleptos/examples/timer_client.js
 nimleptos/examples/hybrid_client.js
+nimleptos/examples/conditional_client.js
 nimleptos/examples/server_app
 nimleptos/examples/server_app.exe
 

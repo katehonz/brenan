@@ -86,6 +86,30 @@ proc testReactiveAttrMacro() =
   doAssert html.contains("<span id=\"test\">hello</span>")
   echo "PASS: reactive attr macro (native fallback)"
 
+proc testConditionalMacro() =
+  let showName = true
+  let name = "Alice"
+  let node = buildHtml:
+    el("div"):
+      if showName:
+        el("p"): text("Hello " & name)
+      else:
+        el("p"): text("Anonymous")
+  let html = renderToHtml(node)
+  doAssert html.contains("<p>Hello Alice</p>")
+  echo "PASS: conditional macro (if/else)"
+
+  let showName2 = false
+  let node2 = buildHtml:
+    el("div"):
+      if showName2:
+        el("p"): text("Hello " & name)
+      else:
+        el("p"): text("Anonymous")
+  let html2 = renderToHtml(node2)
+  doAssert html2.contains("<p>Anonymous</p>")
+  echo "PASS: conditional macro (else branch)"
+
 when isMainModule:
   testTextNode()
   testElementNode()
@@ -97,5 +121,6 @@ when isMainModule:
   testBuildHtmlMacro()
   testElMacro()
   testReactiveAttrMacro()
+  testConditionalMacro()
   echo ""
   echo "All HTML DSL tests passed!"

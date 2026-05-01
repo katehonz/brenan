@@ -44,10 +44,27 @@ when defined(js):
     ## Convert HtmlNode tree to real DOM elements.
     ## If a text node has `reactiveText`, it becomes a live-updating text node.
     ## If an element has `reactiveAttrs`, they are bound to the DOM element.
+    ## If a node has `condition`, it becomes a reactive if/else block.
     if node.isText:
       if node.reactiveText != nil:
         return reactiveTextNode(node.reactiveText)
       return createTextNode(node.text)
+    if node.condition != nil:
+      let wrapper = createElement("div")
+      wrapper.style.setProperty("display", "contents")
+      let thenEl = renderDomNode(node.thenBranch)
+      let elseEl = renderDomNode(node.elseBranch)
+      wrapper.appendChild(thenEl)
+      wrapper.appendChild(elseEl)
+      discard createEffect(proc() =
+        if node.condition():
+          thenEl.style.setProperty("display", "")
+          elseEl.style.setProperty("display", "none")
+        else:
+          thenEl.style.setProperty("display", "none")
+          elseEl.style.setProperty("display", "")
+      )
+      return wrapper
     result = createElement(node.tag)
     for (key, value) in node.attributes:
       result.setAttribute(key, value)

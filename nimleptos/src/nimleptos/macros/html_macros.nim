@@ -158,6 +158,46 @@ proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)
       for a in nestedReactiveAttrs:
         reactiveAttrs.add(a)
       result.children.add(buildElementCall(tagName, staticAttrs, reactiveAttrs, nestedChildren))
+    of nnkIfStmt:
+      let ifBranch = child[0]  # ElifBranch
+      let conditionExpr = ifBranch[0]
+      let thenBody = ifBranch[1]  # StmtList
+      
+      var elseNode: NimNode = nil
+      if child.len > 1 and child[1].kind == nnkElse:
+        let elseBody = child[1][0]  # StmtList
+        let (_, _, elseChildren) = extractAttrsAndBody(elseBody)
+        if elseChildren.len == 1:
+          elseNode = elseChildren[0]
+        elif elseChildren.len > 1:
+          elseNode = buildElementCall("div", @[], @[], elseChildren)
+        else:
+          elseNode = newCall("elementNode", newStrLitNode("div"))
+      
+      if elseNode == nil:
+        elseNode = newCall("elementNode", newStrLitNode("div"))
+      
+      let (_, _, thenChildren) = extractAttrsAndBody(thenBody)
+      var thenNode: NimNode
+      if thenChildren.len == 1:
+        thenNode = thenChildren[0]
+      elif thenChildren.len > 1:
+        thenNode = buildElementCall("div", @[], @[], thenChildren)
+      else:
+        thenNode = newCall("elementNode", newStrLitNode("div"))
+      
+      let conditionProc = newNimNode(nnkLambda)
+      conditionProc.add(newEmptyNode())
+      conditionProc.add(newEmptyNode())
+      conditionProc.add(newEmptyNode())
+      let formalParams = newNimNode(nnkFormalParams)
+      formalParams.add(ident("bool"))
+      conditionProc.add(formalParams)
+      conditionProc.add(newEmptyNode())
+      conditionProc.add(newEmptyNode())
+      conditionProc.add(newStmtList(conditionExpr))
+      
+      result.children.add(newCall("conditionalNode", conditionProc, thenNode, elseNode))
     of nnkInfix:
       if child.len == 3 and $child[0] == "&":
         result.children.add(newCall("textNode", child))

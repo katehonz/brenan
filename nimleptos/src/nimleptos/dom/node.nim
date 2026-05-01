@@ -12,6 +12,9 @@ type
     isText*: bool
     reactiveText*: proc(): string {.closure.}  ## If set, this text node auto-updates in the browser
     reactiveAttrs*: seq[ReactiveAttr]  ## Attributes that auto-update in the browser
+    condition*: proc(): bool {.closure, gcsafe.}  ## For conditional nodes (if/else)
+    thenBranch*: HtmlNode  ## Shown when condition is true
+    elseBranch*: HtmlNode  ## Shown when condition is false
 
 proc escapeHtml*(s: string): string =
   result = s
@@ -39,6 +42,14 @@ proc addReactiveAttr*(node: HtmlNode, name: string, getter: proc(): string {.clo
   ## Used by the buildHtml macro for reactive attribute interpolation.
   node.reactiveAttrs.add((name, getter))
 
+proc conditionalNode*(condition: proc(): bool {.closure, gcsafe.}, thenBranch, elseBranch: HtmlNode): HtmlNode =
+  ## Create a conditional node that shows/hides branches based on a signal.
+  ## Used by the buildHtml macro for reactive if/else control flow.
+  result = elementNode("conditional")
+  result.condition = condition
+  result.thenBranch = thenBranch
+  result.elseBranch = elseBranch
+
 proc addEvent*(node: HtmlNode, event: string, handlerId: string) =
   node.events.add((event, handlerId))
 
@@ -48,6 +59,11 @@ proc addChild*(node: HtmlNode, child: HtmlNode) =
 proc renderToHtml*(node: HtmlNode): string =
   if node.isText:
     return escapeHtml(node.text)
+  if node.condition != nil:
+    if node.condition():
+      return renderToHtml(node.thenBranch)
+    else:
+      return renderToHtml(node.elseBranch)
 
   result = "<" & node.tag
   for (key, value) in node.attributes:
