@@ -23,3 +23,9 @@ task server, "Run server example":
 
 task client, "Compile client-side counter example":
   exec "nim js -p:src -o:examples/counter_client.js examples/counter_client.nim"
+
+task timer, "Compile reactive timer example":
+  exec "nim js -p:src -o:examples/timer_client.js examples/timer_client.nim"
+
+task hybrid, "Compile hybrid buildHtml + reactive DOM example":
+  exec "nim js -p:src -o:examples/hybrid_client.js examples/hybrid_client.nim"

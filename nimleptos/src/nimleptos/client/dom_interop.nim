@@ -10,6 +10,9 @@ when defined(js):
   proc querySelector*(selector: string): DomElement =
     document.querySelector(selector)
 
+  proc querySelector*(el: DomElement, selector: string): DomElement =
+    el.querySelector(cstring(selector))
+
   proc querySelectorAll*(selector: string): seq[DomElement] =
     let nodeList = document.querySelectorAll(selector)
     result = @[]

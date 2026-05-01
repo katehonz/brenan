@@ -252,6 +252,15 @@ nimble example
 
 # Server example (NimMax)
 nimble server
+
+# Client-side counter (CSR, nim js)
+nimble client
+
+# Reactive timer (setInterval + signals, nim js)
+nimble timer
+
+# Hybrid buildHtml + reactive DOM (nim js)
+nimble hybrid
 ```
 
 ## Comparison with Leptos (Rust)

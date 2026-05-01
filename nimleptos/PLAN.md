@@ -88,6 +88,8 @@ Phase 10 добави reactive DOM binding за client-side rendering и под�
 |--------|----------|
 | `examples/counter/main.nim` | SSR counter с reactive signals |
 | `examples/counter_client.nim` | Client-side counter с `nim js` — reactiveTextNode, signals, DOM events |
+| `examples/timer_client.nim` | Reactive timer — setInterval + createEffect, proves dependency tracking in browser |
+| `examples/hybrid_client.nim` | Hybrid buildHtml + reactive DOM — macro DSL + fine-grained updates |
 | `examples/server_app.nim` | NimMax server с NimLeptos rendering, routing, API endpoints |
 
 ---

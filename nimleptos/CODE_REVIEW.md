@@ -140,7 +140,36 @@ src/nimleptos/
 |--------|---------|--------|
 | Native (server) | `nimble test` | ✅ Success |
 | JS (client CSR) | `nimble client` | ✅ Success |
+| JS (reactive timer) | `nimble timer` | ✅ Success |
+| JS (hybrid DSL + DOM) | `nimble hybrid` | ✅ Success |
 | JS (reactive DOM) | `nim js -p:src ...` | ✅ Success |
+
+### Proof: Dependency Tracking Works in the Browser
+
+The `examples/timer_client.nim` example demonstrates that NimLeptos's reactive core (`currentComputation`, `addDependency`, `createEffect`) works correctly when compiled with `nim js`:
+
+```nim
+let (seconds, setSeconds) = createSignal(0)
+
+# createEffect automatically subscribes to `seconds` via addDependency
+let textNode = reactiveTextNode(proc(): string = "Running for " & $seconds() & " seconds")
+
+# setInterval changes the signal, which triggers the effect, which updates the DOM
+window.setInterval(proc() = setSeconds(seconds() + 1), 1000)
+```
+
+No manual `update()` call. No virtual DOM diff. Only the text node changes.
+
+### Hybrid Approach: `buildHtml` + Reactive DOM
+
+`examples/hybrid_client.nim` shows the recommended pattern for CSR:
+
+1. **Build static structure** with `buildHtml` macro DSL
+2. **Render to DOM** with `renderDomNode`
+3. **Find elements** with `querySelector(root, "#id")`
+4. **Attach reactivity** with `reactiveTextNode`, `reactiveStyle`, `addEventListener`
+
+This gives you declarative structure + fine-grained updates without fighting the macro system.
 
 ---
 
