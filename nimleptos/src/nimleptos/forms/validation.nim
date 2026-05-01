@@ -1,6 +1,6 @@
 import nimmax/validater
 import ./form
-import ./table_helper
+import std/tables
 import std/strutils
 
 export validater
@@ -22,7 +22,9 @@ proc addRule*(v: NimLeptosValidator, field: string, rule: Validator, label = "")
     v.fieldLabels.add((field, label))
 
 proc validateFormFields*(v: NimLeptosValidator, form: FormDef, values: seq[(string, string)]): bool =
-  let data = newFormData(values)
+  let data = newTable[string, string]()
+  for (k, v) in values:
+    data[k] = v
   let res = v.nimmax.validate(data)
   result = res.valid
   if not result:

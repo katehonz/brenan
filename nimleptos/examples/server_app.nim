@@ -1,5 +1,5 @@
 import nimmax
-import ../../src/nimleptos
+import ../src/nimleptos
 
 proc homePage(ctx: Context): Future[HtmlNode] {.gcsafe.} =
   result = newFuture[HtmlNode]()

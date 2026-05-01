@@ -114,8 +114,7 @@ src/nimleptos/
 │   └── layout.nim          # mainLayout, sidebarLayout, html5Layout (fixed)
 ├── forms/
 │   ├── form.nim            # FormDef, FormField (fixed textarea/select/checkbox)
-│   ├── validation.nim      # Validators wrapping nimmax/validater
-│   └── table_helper.nim    # Workaround for nimmax TableRef bug
+│   └── validation.nim      # Validators wrapping nimmax/validater
 └── realtime/
     ├── ws_bridge.nim       # ServerSignal[T] (fixed type hierarchy + broadcast)
     └── ws_handler.nim      # WebSocket signal routes (fixed update endpoint)

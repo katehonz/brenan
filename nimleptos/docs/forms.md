@@ -123,6 +123,6 @@ if form.hasErrors():
 
 ---
 
-## TableRef Workaround
+## TableRef
 
-`forms/table_helper.nim` works around a nimmax bug where `TableRef[string, string]` operations cause infinite recursion. Uses `newFormData`, `lookupValue`, `formDataLen` helpers.
+Since NimMax 1.0.0 (commit `00e97a1`), `TableRef[string, string]` operators use fully-qualified stdlib calls (`tables.[]=`, `tables.hasKey`, `tables.getOrDefault`) — no more infinite recursion. Standard `newTable[string, string]()` works without workarounds.
