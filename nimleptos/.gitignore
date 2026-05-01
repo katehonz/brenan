@@ -1,0 +1,23 @@
+# Compiled binaries
+nimleptos/tests/signal_test
+nimleptos/tests/macros_test
+nimleptos/tests/ssr_test
+nimleptos/tests/all_test
+nimleptos/tests/server_test
+nimleptos/examples/counter/main
+nimleptos/examples/server_app
+nimleptos/examples/server_app.exe
+
+# Build artifacts
+nimcache/
+nimblecache/
+*.exe
+*.o
+*.so
+*.dylib
+*.dll
+*.nimble.lock
+
+# IDE
+.vscode/
+.idea/
