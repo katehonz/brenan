@@ -6,7 +6,6 @@ export signal
 
 proc createEffect*(effect: proc() {.closure.}): Computation =
   let comp = Computation(execute: effect)
-  echo "createEffect created Computation"
   trackDependencies(comp)
   return comp
 

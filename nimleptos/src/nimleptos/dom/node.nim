@@ -1,5 +1,14 @@
 import std/strutils
 
+when defined(js):
+  import std/dom
+  type DomEventHandler* = proc(e: Event) {.closure.}
+else:
+  type
+    DomEventObj* = object of RootObj
+    DomEvent* = ref DomEventObj
+    DomEventHandler* = proc(e: DomEvent) {.closure.}
+
 type
   ReactiveAttr* = tuple[name: string, getter: proc(): string {.closure.}]
 
@@ -15,6 +24,7 @@ type
     condition*: proc(): bool {.closure, gcsafe.}  ## For conditional nodes (if/else)
     thenBranch*: HtmlNode  ## Shown when condition is true
     elseBranch*: HtmlNode  ## Shown when condition is false
+    domEventHandlers*: seq[(string, DomEventHandler)]  ## Event handlers for CSR
 
 proc escapeHtml*(s: string): string =
   result = s
@@ -52,6 +62,9 @@ proc conditionalNode*(condition: proc(): bool {.closure, gcsafe.}, thenBranch, e
 
 proc addEvent*(node: HtmlNode, event: string, handlerId: string) =
   node.events.add((event, handlerId))
+
+proc addDomEvent*(node: HtmlNode, event: string, handler: DomEventHandler) =
+  node.domEventHandlers.add((event, handler))
 
 proc addChild*(node: HtmlNode, child: HtmlNode) =
   node.children.add(child)

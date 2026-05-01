@@ -1,8 +1,35 @@
 # NimLeptos — Code Review & Progress Log
 
-**Date**: 2026-05-01
-**Status**: Phase 1-11 Complete
-**Tests**: All passing (39 tests across 5 test suites)
+**Date**: 2026-05-02
+**Status**: Phase 1-12 Complete
+**Tests**: All passing (40 tests across 5 test suites)
+
+---
+
+## Phase 12 Session — Quality & DX Improvements
+
+### Debug Output Cleanup
+- All `echo` statements in `subscriber.nim` and `effects.nim` are now gated behind `when defined(nimleptosDebug)`. Production builds no longer spew debug output.
+- To enable: compile with `-d:nimleptosDebug`
+
+### Reactive Interpolation in buildHtml Macro
+- Non-literal inline expressions in `buildHtml` / `html` macro bodies now automatically generate reactive text nodes (e.g., `p: "Count: " & $count()` or `p: count()` now update reactively on JS target).
+- Previously only `text(expr)` with non-string-literal args was reactive. Now `nnkInfix`, `nnkPrefix`, `nnkIdent`, `nnkDotExpr`, `nnkBracketExpr`, `nnkPar`, `nnkLambda` etc. in the DSL body all produce reactive text nodes.
+
+### Event Binding in DSL (NEW)
+- The `buildHtml`, `html`, and `el` macros now detect event attributes: `onClick`, `onInput`, `onSubmit`, `onChange`, `onFocus`, `onBlur`, `onKeyDown`, `onKeyUp`, `onMouseEnter`, `onMouseLeave`, `onMouseOver`, `onDblClick`.
+- In JS mode, generates `addDomEvent(node, "click", handler)` calls that store the handler closure on the `HtmlNode`.
+- `renderDomNode` attaches stored `domEventHandlers` to the created DOM elements.
+- Added `DomEventHandler` type (cross-backend compatible via `when defined(js)`).
+
+### Element Builder Generation via Templates
+- Replaced 35 nearly-identical element builder procs with two templates: `defineElement` and `defineVoidElement`.
+- Reduced `elements.nim` from 283 lines to 74 lines.
+- Added missing elements: `elH3`-`elH6`, `elOl`, `elThead`, `elTbody`, `elBr`, `elHr`, `elLink`, `elMeta`.
+
+### Other Improvements
+- `parseAttrs` helper function eliminates duplicated attribute parsing logic in the macro module.
+- Added `addDomEvent` proc to `node.nim` for storing client-side event handlers.
 
 ---
 
@@ -124,11 +151,11 @@ src/nimleptos/
 
 ### Current Limitations
 
-1. **No reactive interpolation in `buildHtml` macro**: If you write `text("Count: " & $count())` inside `buildHtml`, the signal is read once at compile time, not auto-wrapped in `createEffect`. For reactive text, use `reactiveTextNode` outside the macro or build DOM manually.
+1. ~~**No reactive interpolation in `buildHtml` macro**~~ → ✅ FIXED in Phase 12. Non-literal expressions in DSL body now automatically produce reactive text nodes on JS target.
 
-2. **`renderDomNode` conditional nodes use display toggling**: Both branches are always in the DOM (hidden via `display: none`). This wastes DOM nodes and could cause issues with event handlers on hidden elements. A better approach would be to add/remove nodes dynamically.
+2. **`renderDomNode` conditional nodes use display toggling**: Both branches are always in the DOM (hidden via `display: none`). This wastes DOM nodes and could cause issues with event handlers on hidden elements.
 
-3. **Event handlers in macros not yet supported**: The `buildHtml` / `el` macros do not yet generate `addEventListener` calls. Use `event_handlers.nim` (`bindClick`, etc.) or manual DOM manipulation.
+3. ~~**Event handlers in macros not yet supported**~~ → ✅ FIXED in Phase 12. `onClick`, `onInput`, etc. are detected by DSL macros and generate `addDomEvent` calls for CSR.
 
 4. **No component composition in macros**: The `view` macro exists but is basic. It generates `proc(name: RootObj): HtmlNode` which is not ergonomic for real use.
 

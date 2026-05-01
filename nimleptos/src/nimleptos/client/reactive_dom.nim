@@ -70,6 +70,8 @@ when defined(js):
       result.setAttribute(key, value)
     for (name, getter) in node.reactiveAttrs:
       reactiveAttr(result, name, getter)
+    for (eventName, handler) in node.domEventHandlers:
+      result.addEventListener(eventName, handler)
     for child in node.children:
       result.appendChild(renderDomNode(child))
 

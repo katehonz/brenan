@@ -8,15 +8,15 @@ A full-stack reactive web framework for Nim, inspired by [Leptos](https://leptos
 ## Features
 
 - **Fine-Grained Reactivity** — Signals, Effects, Memos with automatic dependency tracking (no virtual DOM)
-- **HTML Builder DSL** — Type-safe element construction with `elDiv`, `elP`, `text`, etc.
+- **HTML Builder DSL** — Type-safe element construction with 47 builders + macro DSL with reactive interpolation and event binding
 - **Server-Side Rendering** — Full HTML pages rendered on the server with hydration markers
 - **NimMax Backend** — Routing, middleware, sessions, CSRF, CORS, validation, WebSocket, caching
 - **Route Components** — Declarative `route()` with layout composition
 - **Form Handling** — Declarative forms with 15+ validators from NimMax
 - **WebSocket Reactivity** — Real-time signal synchronization between server and clients
 - **Client Hydration** — `nim js` compilation for progressive enhancement
-- **Client-Side Rendering** — Fine-grained reactive DOM updates with `mountApp` and `reactiveTextNode`
-- **HTML DSL Macros** — `buildHtml` and `el()` macros for declarative DOM trees
+- **Client-Side Rendering** — Fine-grained reactive DOM updates with `mountApp`, `reactiveTextNode`, and event binding through DSL
+- **HTML DSL Macros** — `buildHtml`, `html`, and `el()` macros with reactive interpolation and inline event handlers (`onClick`, `onInput`, etc.)
 - **Type-Safe** — Full Nim type system, `Option[T]` for safe parameter access
 
 ## Quick Start
@@ -91,18 +91,25 @@ let page = elDiv([("class", "container")],
 echo renderToHtml(page)
 ```
 
-### Macro DSL (New)
+### Macro DSL
 
 ```nim
-import nimleptos/macros/html_macros
+import nimleptos
+
+# buildHtml with reactive interpolation and event binding
+let (count, setCount) = createSignal(0)
 
 let page = buildHtml:
   el("div", class="container"):
     el("h1"): text("Welcome")
-    el("p", class="subtitle"): text("Hello, NimLeptos!")
+    el("p", class="subtitle"): "Count: " & $count()  # reactive text
+    el("button", onClick=proc(e: DomEvent) = setCount(count() + 1)):
+      text("Increment")
 
 echo renderToHtml(page)
 ```
+
+Event attributes (`onClick`, `onInput`, `onSubmit`, etc.) are detected automatically and generate client-side event handlers when compiled with `nim js`. Non-literal expressions in the DSL body become reactive text nodes. All 47 HTML element builders are available: `elDiv`, `elSpan`, `elInput`, `elImg`, etc.
 
 ## Server-Side Rendering
 
@@ -351,7 +358,7 @@ nimble wasm
 | Rendering | Virtual DOM / SSR | HtmlNode tree / SSR |
 | Backend | Actix/Axum | NimMax |
 | Compilation | WASM + Native | Native (server) + JS (client) + WASM (core) |
-| Macros | `view!` | `elDiv()`, `text()` builders |
+| Macros | `view!` | `buildHtml`, `el()` DSL with reactive interpolation & events |
 | Hydration | WASM-based | `nim js` + `data-nl-id` |
 
 ## License
