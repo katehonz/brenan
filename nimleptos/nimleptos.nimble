@@ -35,6 +35,9 @@ task hybrid, "Compile hybrid buildHtml + reactive DOM example":
 task conditional, "Compile reactive if/else example":
   exec "nim js -p:src -o:examples/conditional_client.js examples/conditional_client.nim"
 
+task todo, "Run full-stack todo app example":
+  exec "nim c -r --threads:on -p:src examples/todo_app.nim"
+
 task wasm, "Compile reactive core to WASM":
   var emcc = findExe("emcc")
   if emcc == "":

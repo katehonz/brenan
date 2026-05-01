@@ -243,6 +243,22 @@ Open `examples/wasm_reactive.html` in a browser to see the interactive demo.
 
 > **Note:** Avoid `echo` inside `createEffect` when compiling to WASM — it can block stdout and cause deadlock in the Emscripten runtime. Use JS-side logging instead.
 
+## Full-Stack Example: Todo App
+
+A complete end-to-end application demonstrating SSR, forms, validation, and REST API:
+
+```bash
+nimble todo
+# Open http://localhost:8080
+```
+
+Features:
+- Server-side rendered todo list with hydration markers
+- Form validation (required fields)
+- Toggle complete / delete tasks
+- REST API at `/api/todos`
+- Thread-safe in-memory storage
+
 ## WebSocket Realtime
 
 ```nim
@@ -315,6 +331,9 @@ nimble hybrid
 
 # Reactive if/else conditional (nim js)
 nimble conditional
+
+# Full-stack Todo App (SSR + forms + validation)
+nimble todo
 
 # Reactive core to WASM (requires Emscripten)
 nimble wasm

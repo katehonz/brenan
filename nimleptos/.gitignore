@@ -29,3 +29,5 @@ nimblecache/
 # WASM build artifacts
 examples/wasm_reactive.js
 examples/wasm_reactive.wasm
+examples/todo_app
+tests/*_test
