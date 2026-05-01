@@ -20,3 +20,6 @@ task example, "Run counter example":
 
 task server, "Run server example":
   exec "nim c -r --threads:on -p:src examples/server_app.nim"
+
+task client, "Compile client-side counter example":
+  exec "nim js -p:src -o:examples/counter_client.js examples/counter_client.nim"

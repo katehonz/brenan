@@ -5,6 +5,9 @@ import nimleptos/dom/elements
 import nimleptos/macros/html_macros
 import nimleptos/ssr/renderer
 import nimleptos/ssr/hydration
+import nimleptos/client/reactive_dom
+import nimleptos/client/hydration_client
+import nimleptos/client/event_handlers
 import nimleptos/server/adapter
 import nimleptos/server/app
 import nimleptos/server/middleware
@@ -20,6 +23,9 @@ export elements
 export html_macros
 export renderer
 export hydration
+export reactive_dom
+export hydration_client
+export event_handlers
 export adapter
 export app
 export middleware

@@ -25,7 +25,7 @@ when defined(js):
     let nodes = querySelectorAll("[data-nl-id]")
     result = nodes
     for node in nodes:
-      let id = getAttribute(node, "data-nl-id")
+      discard getAttribute(node, "data-nl-id")
       node.setAttribute("data-nl-hydrated", "true")
 
   proc attachEvent*(node: DomElement, event: string,
@@ -46,9 +46,12 @@ when defined(js):
     onDOMContentLoaded(proc() =
       hydrateApp()
     )
+
 else:
   proc hydrateApp*() =
     discard
 
   proc initHydration*() =
     discard
+
+

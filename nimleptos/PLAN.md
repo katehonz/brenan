@@ -1,12 +1,14 @@
 # NimLeptos + NimMax — Project Status
 
-## Статус: Phase 1-9 COMPLETE
+## Статус: Phase 1-10 COMPLETE
+
+Phase 10 добави reactive DOM binding за client-side rendering и подобри HTML DSL макросите.
 
 Всички фази са реализирани и тестовете минават.
 
 ---
 
-## Реализирани модули (22 файла)
+## Реализирани модули (23 файла)
 
 ### Reactive Core (`src/nimleptos/reactive/`)
 | Файл | Описание |
@@ -24,7 +26,7 @@
 ### Macros (`src/nimleptos/macros/`)
 | Файл | Описание |
 |------|----------|
-| `html_macros.nim` | html/view macros (compile-time HTML DSL) |
+| `html_macros.nim` | html/view/buildHtml/el macros (compile-time HTML DSL) |
 
 ### SSR (`src/nimleptos/ssr/`)
 | Файл | Описание |
@@ -62,6 +64,7 @@
 | Файл | Описание |
 |------|----------|
 | `dom_interop.nim` | DOM manipulation via jsffi (getElementById, querySelector, addEventListener, etc.) |
+| `reactive_dom.nim` | Fine-grained reactive DOM — renderDomNode, reactiveTextNode, reactiveAttr, reactiveClass, reactiveStyle, mountApp, mountReactiveApp |
 | `hydration_client.nim` | Client-side hydration — loadHydrationData, hydrateNodes, hydrateApp |
 | `event_handlers.nim` | bindEvent, bindClick, bindSubmit, bindInput, applyBindings, initEventHandlers |
 
@@ -74,7 +77,7 @@
 | `tests/all_test.nim` | PASS — 9 tests (signal, reactivity, memo, batch, HTML, SSR, hydration, escapeHtml, dependency tracking) |
 | `tests/server_test.nim` | PASS — 9 tests (app creation, render, title, fragment, route component, layout, form, validation, route group) |
 | `tests/signal_test.nim` | PASS |
-| `tests/macros_test.nim` | PASS |
+| `tests/macros_test.nim` | PASS — 9 tests (buildHtml, el macro) |
 | `tests/ssr_test.nim` | PASS |
 
 ---
@@ -84,6 +87,7 @@
 | Пример | Описание |
 |--------|----------|
 | `examples/counter/main.nim` | SSR counter с reactive signals |
+| `examples/counter_client.nim` | Client-side counter с `nim js` — reactiveTextNode, signals, DOM events |
 | `examples/server_app.nim` | NimMax server с NimLeptos rendering, routing, API endpoints |
 
 ---
@@ -105,6 +109,9 @@ nimble test
 
 # Стартиране на server пример
 nimble server
+
+# Компилиране на client пример
+nimble client
 ```
 
 ```nim

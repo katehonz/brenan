@@ -13,30 +13,36 @@ when defined(js):
   proc querySelectorAll*(selector: string): seq[DomElement] =
     let nodeList = document.querySelectorAll(selector)
     result = @[]
-    for i in 0 ..< nodeList.length:
+    for i in 0 ..< nodeList.len:
       result.add(nodeList[i])
 
   proc setAttribute*(el: DomElement, name: string, value: string) =
-    el.setAttribute(name, value)
+    el.setAttribute(cstring(name), cstring(value))
 
   proc getAttribute*(el: DomElement, name: string): string =
     $el.getAttribute(name)
 
   proc setInnerHtml*(el: DomElement, html: string) =
-    el.innerHTML = html
+    el.innerHTML = cstring(html)
 
   proc getInnerHtml*(el: DomElement): string =
     $el.innerHTML
+
+  proc setTextContent*(el: DomElement, text: string) =
+    el.textContent = cstring(text)
+
+  proc getTextContent*(el: DomElement): string =
+    $el.textContent
 
   proc addEventListener*(el: DomElement, event: string,
       handler: proc(e: Event) {.closure.}) =
     el.addEventListener(event, handler)
 
   proc createElement*(tag: string): DomElement =
-    document.createElement(tag)
+    document.createElement(cstring(tag))
 
   proc createTextNode*(text: string): DomElement =
-    document.createTextNode(text)
+    cast[DomElement](document.createTextNode(cstring(text)))
 
   proc appendChild*(parent, child: DomElement) =
     parent.appendChild(child)
@@ -45,7 +51,7 @@ when defined(js):
     parent.removeChild(child)
 
   proc setStyle*(el: DomElement, prop: string, value: string) =
-    el.style.setProperty(prop, value)
+    el.style.setProperty(cstring(prop), cstring(value))
 else:
   type
     DomElement* = ref object

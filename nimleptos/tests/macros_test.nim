@@ -1,5 +1,7 @@
+import std/strutils
 import ../src/nimleptos/dom/node
 import ../src/nimleptos/dom/elements
+import ../src/nimleptos/macros/html_macros
 
 proc testTextNode() =
   let node = textNode("Hello")
@@ -52,6 +54,27 @@ proc testRenderToHtmlRaw() =
   doAssert renderToHtmlRaw(node) == "<div class=\"test\"><b>raw</b></div>"
   echo "PASS: renderToHtmlRaw"
 
+proc testBuildHtmlMacro() =
+  let node = buildHtml:
+    el("div", class="app", id="main"):
+      el("h1"): text("Title")
+      el("p"): text("Hello")
+  let html = renderToHtml(node)
+  doAssert html.contains("<div class=\"app\" id=\"main\">")
+  doAssert html.contains("<h1>Title</h1>")
+  doAssert html.contains("<p>Hello</p>")
+  echo "PASS: buildHtml macro"
+
+proc testElMacro() =
+  let node = el("section", class="content"):
+    el("article"):
+      el("h2"): text("Article")
+  let html = renderToHtml(node)
+  doAssert html.contains("<section class=\"content\">")
+  doAssert html.contains("<article>")
+  doAssert html.contains("<h2>Article</h2>")
+  echo "PASS: el macro"
+
 when isMainModule:
   testTextNode()
   testElementNode()
@@ -60,5 +83,7 @@ when isMainModule:
   testEscapeHtml()
   testDomBuilders()
   testRenderToHtmlRaw()
+  testBuildHtmlMacro()
+  testElMacro()
   echo ""
   echo "All HTML DSL tests passed!"

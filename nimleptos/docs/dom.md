@@ -109,19 +109,53 @@ echo renderToHtmlRaw(node)  # <p><b>safe</b></p>
 
 ## Compile-Time Macros
 
-For a more concise syntax, use the `html` macro:
+For a more declarative syntax, use the `buildHtml` and `el` macros:
 
 ```nim
 import nimleptos/macros/html_macros
 
-# Coming in future versions
-# let page = html:
-#   div(class="container"):
-#     h1: text "Hello"
-#     p: text "World"
+let page = buildHtml:
+  el("div", class="container", id="main"):
+    el("h1"): text("Welcome")
+    el("p", class="subtitle"): text("Hello, NimLeptos!")
+    el("button", id="btn"): text("Click me")
+
+echo renderToHtml(page)
+# <div class="container" id="main"><h1>Welcome</h1><p class="subtitle">Hello, NimLeptos!</p><button id="btn">Click me</button></div>
 ```
 
-> Note: The macro DSL is experimental. The builder API is the recommended approach for production code.
+### `buildHtml` Macro
+
+Wraps a block of element declarations and returns a single `HtmlNode`:
+
+```nim
+let node = buildHtml:
+  el("section", class="content"):
+    el("article"):
+      el("h2"): text("Article Title")
+      el("p"): text("Article body...")
+```
+
+### `el` Macro
+
+Creates a single HTML element with attributes and children:
+
+```nim
+let node = el("div", class="card"):
+  el("h3"): text("Card Title")
+  el("p"): text("Card content")
+```
+
+Attributes are passed as `name="value"` pairs before the body block.
+
+### Macro DSL vs Builder API
+
+| Feature | Builder API (`elDiv`) | Macro DSL (`buildHtml`) |
+|---------|----------------------|-------------------------|
+| Syntax | Function calls | Declarative, HTML-like |
+| Attributes | Array of tuples | Inline `name="value"` |
+| Performance | Runtime | Compile-time expansion |
+| Recommended for | Dynamic content | Static/templates |
 
 ## Nesting Patterns
 

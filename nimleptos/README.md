@@ -15,6 +15,8 @@ A full-stack reactive web framework for Nim, inspired by [Leptos](https://leptos
 - **Form Handling** — Declarative forms with 15+ validators from NimMax
 - **WebSocket Reactivity** — Real-time signal synchronization between server and clients
 - **Client Hydration** — `nim js` compilation for progressive enhancement
+- **Client-Side Rendering** — Fine-grained reactive DOM updates with `mountApp` and `reactiveTextNode`
+- **HTML DSL Macros** — `buildHtml` and `el()` macros for declarative DOM trees
 - **Type-Safe** — Full Nim type system, `Option[T]` for safe parameter access
 
 ## Quick Start
@@ -77,12 +79,27 @@ batch(proc() =
 
 ## HTML Builder
 
+### Functional DSL
+
 ```nim
 let page = elDiv([("class", "container")],
   elH1([], text("Welcome")),
   elP([("class", "subtitle")], text("Hello, NimLeptos!")),
   elButton([("id", "btn")], text("Click me"))
 )
+
+echo renderToHtml(page)
+```
+
+### Macro DSL (New)
+
+```nim
+import nimleptos/macros/html_macros
+
+let page = buildHtml:
+  el("div", class="container"):
+    el("h1"): text("Welcome")
+    el("p", class="subtitle"): text("Hello, NimLeptos!")
 
 echo renderToHtml(page)
 ```
@@ -95,6 +112,48 @@ let body = elDiv([], text("Hello"))
 let html = renderFullPage(ctx, body, "My Page")
 # Returns full HTML with hydration markers
 ```
+
+## Client-Side Rendering
+
+Compile with `nim js` and mount directly to the DOM:
+
+```nim
+import nimleptos/client/reactive_dom
+import nimleptos/client/dom_interop
+import nimleptos/reactive/signal
+import std/dom
+
+when defined(js):
+  proc counterApp(): seq[DomElement] =
+    let (count, setCount) = createSignal(0)
+
+    let display = createElement("p")
+    let textEl = reactiveTextNode(proc(): string = "Count: " & $count())
+    display.appendChild(textEl)
+
+    let btn = createElement("button")
+    btn.textContent = "+"
+    btn.addEventListener("click", proc(e: Event) =
+      setCount(count() + 1)
+    )
+
+    return @[display, btn]
+
+  mountReactiveApp("#app", counterApp)
+```
+
+```bash
+nim js -p:src -o:app.js app.nim
+```
+
+### Reactive DOM Bindings
+
+- `reactiveTextNode(getter)` — Text node that auto-updates from a signal
+- `reactiveAttr(el, name, getter)` — Attribute bound to a signal
+- `reactiveClass(el, getter)` — CSS class bound to a signal
+- `reactiveStyle(el, prop, getter)` — Style property bound to a signal
+- `mountApp(selector, builder)` — Mount an HtmlNode tree to the DOM
+- `mountReactiveApp(selector, builder)` — Mount reactive DomElements directly
 
 ## Routing
 
