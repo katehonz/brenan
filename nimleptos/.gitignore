@@ -25,3 +25,7 @@ nimblecache/
 # IDE
 .vscode/
 .idea/
+
+# WASM build artifacts
+examples/wasm_reactive.js
+examples/wasm_reactive.wasm

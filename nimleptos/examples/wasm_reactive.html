@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NimLeptos Reactive Core in WASM</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 20px; }
+    .counter { font-size: 3rem; font-weight: bold; text-align: center; margin: 20px 0; }
+    .doubled { text-align: center; color: #666; margin-bottom: 20px; }
+    .buttons { display: flex; gap: 10px; justify-content: center; }
+    button { font-size: 1.2rem; padding: 10px 24px; border-radius: 6px; border: none; cursor: pointer; }
+    .inc { background: #22c55e; color: white; }
+    .dec { background: #ef4444; color: white; }
+    button:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <h1>🚀 Nim Reactive Core (WASM)</h1>
+  <p>Signals, memos, and effects compiled from Nim to WebAssembly.</p>
+
+  <div class="counter" id="count">0</div>
+  <div class="doubled">Doubled: <span id="doubled">0</span></div>
+
+  <div class="buttons">
+    <button class="dec" id="btnDec">−</button>
+    <button class="inc" id="btnInc">+</button>
+  </div>
+
+  <script type="module">
+    import initWasm from './wasm_reactive.js';
+    const module = await initWasm();
+
+    // Initialize Nim globals (must call _main once before any exports)
+    module._main();
+
+    function updateDisplay() {
+      document.getElementById('count').textContent = module._getCount();
+      document.getElementById('doubled').textContent = module._getDoubled();
+    }
+
+    document.getElementById('btnInc').onclick = () => {
+      module._increment();
+      updateDisplay();
+    };
+
+    document.getElementById('btnDec').onclick = () => {
+      module._decrement();
+      updateDisplay();
+    };
+
+    updateDisplay();
+  </script>
+</body>
+</html>

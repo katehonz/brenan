@@ -32,3 +32,13 @@ task hybrid, "Compile hybrid buildHtml + reactive DOM example":
 
 task conditional, "Compile reactive if/else example":
   exec "nim js -p:src -o:examples/conditional_client.js examples/conditional_client.nim"
+
+task wasm, "Compile reactive core to WASM":
+  let emcc = "/home/ziko/emsdk/upstream/emscripten/emcc"
+  exec "nim c --cpu:wasm32 --mm:arc -p:src " &
+    "--cc:clang --clang.exe:" & emcc & " --clang.linkerexe:" & emcc & " " &
+    "--passC:\"-sWASM=1\" " &
+    "--passL:\"-sWASM=1 -sMODULARIZE=1 -sEXPORT_NAME='NimLeptosWasm' " &
+    "-sEXPORTED_FUNCTIONS=['_main','_increment','_decrement','_getCount','_getDoubled'] " &
+    "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']\" " &
+    "-o:examples/wasm_reactive.js examples/wasm_reactive.nim"
