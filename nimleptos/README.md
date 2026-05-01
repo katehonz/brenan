@@ -292,7 +292,7 @@ nimleptos/
 ## Testing
 
 ```bash
-nimble test
+nimble test   # 40 tests across 5 suites
 ```
 
 ## Examples
@@ -312,6 +312,9 @@ nimble timer
 
 # Hybrid buildHtml + reactive DOM (nim js)
 nimble hybrid
+
+# Reactive if/else conditional (nim js)
+nimble conditional
 
 # Reactive core to WASM (requires Emscripten)
 nimble wasm

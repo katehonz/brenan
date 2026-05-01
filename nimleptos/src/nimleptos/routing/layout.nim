@@ -6,7 +6,15 @@ import ./route
 proc html5Layout*(headNodes: seq[HtmlNode] = @[], bodyClass = ""): LayoutComponent =
   result = proc(ctx: Context, children: HtmlNode): Future[HtmlNode] {.gcsafe.} =
     result = newFuture[HtmlNode]()
-    complete(result, elDiv([], children))
+    var bodyAttrs: seq[(string, string)] = @[]
+    if bodyClass.len > 0:
+      bodyAttrs.add(("class", bodyClass))
+    var headChildren: seq[HtmlNode] = @[]
+    for node in headNodes:
+      headChildren.add(node)
+    let head = elHead([], headChildren)
+    let body = elBody(bodyAttrs, children)
+    complete(result, elHtml([], head, body))
 
 proc mainLayout*(navHtml: HtmlNode = nil, footerHtml: HtmlNode = nil): LayoutComponent =
   result = proc(ctx: Context, children: HtmlNode): Future[HtmlNode] {.gcsafe.} =

@@ -1,87 +1,59 @@
 # NimLeptos — Code Review & Progress Log
 
 **Date**: 2026-05-01
-**Status**: Phase 1-10 Complete
-**Tests**: All passing (28 tests across 4 test suites)
+**Status**: Phase 1-11 Complete
+**Tests**: All passing (39 tests across 5 test suites)
 
 ---
 
-## What Was Delivered in This Session
+## Phase 11 Session — Bug Fixes & Improvements
 
-### 1. Reactive DOM Binding (`src/nimleptos/client/reactive_dom.nim`)
+### Critical Bugs Fixed
 
-Implements fine-grained client-side DOM updates without Virtual DOM. When a signal changes, only the specific text node or attribute updates — not the entire component.
+1. **`ws_bridge.nim` type mismatch (runtime crash)**: `ServerSignal[T]` did not inherit from `ServerSignalBase`. The `SignalRegistry` stored `ServerSignalBase` but `handleSignalMessage` tried to access `.subscribers` on it — field didn't exist. Fixed by making `ServerSignal[T] = ref object of ServerSignalBase` with `name` and `subscribers` on the base type.
 
-| Proc | Purpose |
-|------|---------|
-| `renderDomNode(node)` | Converts `HtmlNode` tree → real DOM `Element`s |
-| `reactiveTextNode(getter)` | Text node auto-updates from a `Getter[string]` signal |
-| `reactiveAttr(el, name, getter)` | Attribute bound to signal |
-| `reactiveClass(el, getter)` | `class` attribute bound to signal |
-| `reactiveStyle(el, prop, getter)` | CSS property bound to signal |
-| `mountApp(selector, builder)` | Mount `HtmlNode` tree to DOM element |
-| `mountReactiveApp(selector, builder)` | Mount reactive `DomElement`s directly |
-| `clearChildren(el)` | Remove all child nodes |
+2. **`ws_handler.nim` `signalUpdateEndpoint`**: Cleared `sig.subscribers = @[]` instead of broadcasting the new value. Fixed to parse the JSON value and call `broadcastToSubscribers(rawValue)`.
 
-**Key design decision**: `reactiveTextNode` returns a `DomElement` (text node) that is appended to a parent. The `createEffect` inside it automatically updates `textContent` when the signal changes. This is the Solid/Leptos "fine-grained" approach.
+3. **`forms/form.nim` invalid HTML**: `textarea`, `select`, `checkbox` field types rendered as `<input type="textarea">` etc. (invalid HTML). Fixed with proper `case` dispatch: `textarea` → `<textarea>`, `select` → `<select>` with `<option>` children, `checkbox` → `<input type="checkbox">` with `checked` support. Added `options: seq[(string, string)]` field to `FormField`.
 
-**Type safety fix**: `createTextNode` in `dom_interop.nim` now correctly casts `Node` → `DomElement` (`cast[DomElement](document.createTextNode(...))`), fixing a Nim JS backend type mismatch.
+### Medium Priority Fixes
 
-**CString warnings fixed**: All DOM wrapper procs in `dom_interop.nim` now explicitly cast strings to `cstring` before passing to `std/dom`, eliminating Nim 2.2 conversion warnings.
+4. **`layout.nim` `html5Layout` ignored parameters**: `headNodes` and `bodyClass` were accepted but never used. Fixed to generate proper `<html><head>...</head><body class="...">...</body></html>` structure.
 
-### 2. Improved HTML Macro DSL (`src/nimleptos/macros/html_macros.nim`)
+5. **`middleware.nim` were no-ops**: All three middlewares just called `switch(ctx)`. Fixed `hydrationMiddleware` to set `__hydration_enabled__` context flag, removed unused imports.
 
-The macro DSL was rewritten to support:
-- **`buildHtml:`** block macro that transforms declarative HTML-like syntax into `HtmlNode` construction code at compile time
-- **`el("tag", attr="value"):`** element macro with inline attributes
-- **Nested elements** with arbitrary depth
-- **Text nodes** via `text("content")` command
-- **Attribute propagation** to nested calls
+6. **`event_handlers.nim` type incompatibility**: JS branch defined `EventHandler = proc(e: Event)` while native branch defined `EventHandler = proc()` — incompatible types. Fixed native branch to define a stub `Event` type and use `proc(e: Event)`.
 
-Example:
-```nim
-let node = buildHtml:
-  el("div", class="app", id="main"):
-    el("h1"): text("Title")
-    el("p"): text("Hello")
-```
+7. **`node.nim` `renderToHtmlRaw` missing condition handling**: Didn't evaluate `condition` nodes like `renderToHtml` does — rendered raw `<conditional>` tag instead. Fixed to check `node.condition` and evaluate branches.
 
-**Bug fixed**: Earlier versions generated `<text></text>` elements instead of actual text nodes. The `nnkCall` branch now detects `text("...")` calls and routes them to `textNode(...)` instead of `elementNode("text")`.
+8. **`effects.nim` `Memo[T].value` dead data**: `memo.value` was never updated after construction; `cachedValue` closure variable was used instead. Fixed to sync `memo.value = cachedValue` on every recomputation.
 
-### 3. Client-Side Counter Example
+9. **`hydration_client.nim` improved**: Now returns `HydrationState` from `hydrateApp`, supports `onHydrate` callbacks for registering custom hydration handlers, and properly handles `DOMContentLoaded` timing.
 
-`examples/counter_client.nim` + `examples/counter_client.html`
+### New Element Builders
 
-A complete standalone client-side app that:
-- Creates signals (`createSignal(0)`)
-- Creates a memo (`createMemo(proc(): int = count() * 2)`)
-- Binds reactive text to DOM via `reactiveTextNode`
-- Handles click events via `addEventListener`
-- Mounts to `#app` via `mountReactiveApp`
+Added 19 missing HTML element builders to `elements.nim`:
+`elTextarea`, `elSelect`, `elOption`, `elTable`, `elTr`, `elTd`, `elTh`, `elImg`, `elMain`, `elArticle`, `elAside`, `elPre`, `elCode`, `elHead`, `elBody`, `elHtml`, `elScript`, `elStyle`, `elTitle`
 
-Build:
-```bash
-nimble client   # compiles to examples/counter_client.js
-```
+---
 
-### 4. Architecture Fixes
+## Previous Sessions Summary
 
-**Cyclic dependency resolved**: `hydration_client.nim` imported `event_handlers.nim` and vice versa. `mountApp` / `mountReactiveApp` were moved to `reactive_dom.nim`, breaking the cycle:
-```
-reactive_dom.nim → event_handlers.nim → hydration_client.nim → dom_interop.nim
-```
+### Phase 1-10 (Original Development)
+- Reactive core (signals, effects, memos, batching)
+- DOM types and element builders
+- SSR rendering and hydration markers
+- NimMax server adapter
+- Routing and layout components
+- Form handling and validation
+- WebSocket realtime signals
+- Client-side hydration framework
+- Event handler binding system
+- Reactive DOM bindings + improved macro DSL
 
-**Nimble task added**: `nimble client` compiles the CSR example.
-
-**Documentation updated**:
-- `docs/client.md` — Added full CSR section with reactive binding examples
-- `docs/dom.md` — Replaced "experimental" macro note with full `buildHtml` / `el` documentation
-- `README.md` — Added CSR, reactive DOM, and macro DSL sections
-- `PLAN.md` — Updated to Phase 1-10, 23 files, new example listed
-
-### 5. NimMax Bugs File Removed
-
-`docs/nimmax-bugs.md` was deleted because all reported NimMax bugs have been fixed upstream and merged into the NimMax repository.
+### Phase 11 (WASM)
+- WebAssembly compilation of reactive core via Emscripten
+- `nimble wasm` task with Emscripten SDK detection
 
 ---
 
@@ -92,10 +64,10 @@ src/nimleptos/
 ├── reactive/
 │   ├── subscriber.nim      # Signal[T], dependency tracking, scheduler, batch
 │   ├── signal.nim          # createSignal, Getter/Setter types
-│   └── effects.nim         # createEffect, createMemo
+│   └── effects.nim         # createEffect, createMemo (fixed memo.value sync)
 ├── dom/
-│   ├── node.nim            # HtmlNode type, renderToHtml, escapeHtml
-│   └── elements.nim        # elDiv, elSpan, elP, elButton, text, etc.
+│   ├── node.nim            # HtmlNode type, renderToHtml, renderToHtmlRaw (fixed), escapeHtml
+│   └── elements.nim        # 35 element builders (19 new)
 ├── macros/
 │   └── html_macros.nim     # buildHtml, el, html macros (compile-time DSL)
 ├── ssr/
@@ -103,23 +75,23 @@ src/nimleptos/
 │   └── hydration.nim       # data-nl-id injection, hydration script
 ├── client/
 │   ├── dom_interop.nim     # DOM manipulation wrappers for JS backend
-│   ├── reactive_dom.nim    # Fine-grained reactive DOM binding (NEW)
-│   ├── hydration_client.nim # Client-side hydration
-│   └── event_handlers.nim  # Event binding system
+│   ├── reactive_dom.nim    # Fine-grained reactive DOM binding
+│   ├── hydration_client.nim # Client-side hydration (improved with callbacks)
+│   └── event_handlers.nim  # Event binding system (fixed type compat)
 ├── server/
 │   ├── adapter.nim         # Bridge between NimLeptos HtmlNode and NimMax Context
 │   ├── app.nim             # NimLeptosApp wrapper around nimmax Application
-│   └── middleware.nim      # hydrationMiddleware, titleMiddleware, clientAssetsMiddleware
+│   └── middleware.nim      # Functional middlewares (hydration, title, assets)
 ├── routing/
 │   ├── route.nim           # Declarative route components with layouts
-│   └── layout.nim          # mainLayout, sidebarLayout, html5Layout
+│   └── layout.nim          # mainLayout, sidebarLayout, html5Layout (fixed)
 ├── forms/
-│   ├── form.nim            # FormDef, FormField, renderForm
+│   ├── form.nim            # FormDef, FormField (fixed textarea/select/checkbox)
 │   ├── validation.nim      # Validators wrapping nimmax/validater
 │   └── table_helper.nim    # Workaround for nimmax TableRef bug
 └── realtime/
-    ├── ws_bridge.nim       # ServerSignal[T], SignalRegistry
-    └── ws_handler.nim      # WebSocket signal routes
+    ├── ws_bridge.nim       # ServerSignal[T] (fixed type hierarchy + broadcast)
+    └── ws_handler.nim      # WebSocket signal routes (fixed update endpoint)
 ```
 
 ---
@@ -129,10 +101,11 @@ src/nimleptos/
 | Suite | Tests | Status |
 |-------|-------|--------|
 | `tests/signal_test.nim` | 5 | ✅ PASS |
-| `tests/macros_test.nim` | 9 | ✅ PASS (includes new buildHtml + el tests) |
+| `tests/macros_test.nim` | 12 | ✅ PASS |
 | `tests/ssr_test.nim` | 5 | ✅ PASS |
 | `tests/server_test.nim` | 9 | ✅ PASS |
-| **Total** | **28** | **✅ All passing** |
+| `tests/all_test.nim` | 9 | ✅ PASS |
+| **Total** | **40** | **✅ All passing** |
 
 ### Compilation Checks
 
@@ -142,34 +115,8 @@ src/nimleptos/
 | JS (client CSR) | `nimble client` | ✅ Success |
 | JS (reactive timer) | `nimble timer` | ✅ Success |
 | JS (hybrid DSL + DOM) | `nimble hybrid` | ✅ Success |
-| JS (reactive DOM) | `nim js -p:src ...` | ✅ Success |
-
-### Proof: Dependency Tracking Works in the Browser
-
-The `examples/timer_client.nim` example demonstrates that NimLeptos's reactive core (`currentComputation`, `addDependency`, `createEffect`) works correctly when compiled with `nim js`:
-
-```nim
-let (seconds, setSeconds) = createSignal(0)
-
-# createEffect automatically subscribes to `seconds` via addDependency
-let textNode = reactiveTextNode(proc(): string = "Running for " & $seconds() & " seconds")
-
-# setInterval changes the signal, which triggers the effect, which updates the DOM
-window.setInterval(proc() = setSeconds(seconds() + 1), 1000)
-```
-
-No manual `update()` call. No virtual DOM diff. Only the text node changes.
-
-### Hybrid Approach: `buildHtml` + Reactive DOM
-
-`examples/hybrid_client.nim` shows the recommended pattern for CSR:
-
-1. **Build static structure** with `buildHtml` macro DSL
-2. **Render to DOM** with `renderDomNode`
-3. **Find elements** with `querySelector(root, "#id")`
-4. **Attach reactivity** with `reactiveTextNode`, `reactiveStyle`, `addEventListener`
-
-This gives you declarative structure + fine-grained updates without fighting the macro system.
+| JS (conditional) | `nimble conditional` | ✅ Success |
+| WASM | `nimble wasm` | ✅ Success (requires Emscripten) |
 
 ---
 
@@ -179,11 +126,13 @@ This gives you declarative structure + fine-grained updates without fighting the
 
 1. **No reactive interpolation in `buildHtml` macro**: If you write `text("Count: " & $count())` inside `buildHtml`, the signal is read once at compile time, not auto-wrapped in `createEffect`. For reactive text, use `reactiveTextNode` outside the macro or build DOM manually.
 
-2. **`renderDomNode` does not preserve reactive bindings**: `mountApp` converts a static `HtmlNode` tree to DOM. Any signals used while building the `HtmlNode` are evaluated once. For reactive CSR, use `mountReactiveApp` with direct DOM construction.
+2. **`renderDomNode` conditional nodes use display toggling**: Both branches are always in the DOM (hidden via `display: none`). This wastes DOM nodes and could cause issues with event handlers on hidden elements. A better approach would be to add/remove nodes dynamically.
 
 3. **Event handlers in macros not yet supported**: The `buildHtml` / `el` macros do not yet generate `addEventListener` calls. Use `event_handlers.nim` (`bindClick`, etc.) or manual DOM manipulation.
 
 4. **No component composition in macros**: The `view` macro exists but is basic. It generates `proc(name: RootObj): HtmlNode` which is not ergonomic for real use.
+
+5. **Thread safety**: Global mutable state in `subscriber.nim` (`currentComputation`, `globalScheduler`) is not thread-safe. Fine for single-threaded JS but problematic for multi-threaded native servers.
 
 ### Recommended Next Steps
 
@@ -195,25 +144,6 @@ This gives you declarative structure + fine-grained updates without fighting the
 
 4. **CSS-in-Nim / scoped styles**: Add a `style` macro or template that generates scoped CSS for components.
 
-5. **WASM backend exploration**: The user expressed interest in WASM. Current `nim js` is the proven path. A future experiment could compile the reactive core to WASM and keep DOM manipulation in JS via a thin bridge.
+5. **Server-side signal state persistence**: Add ability to serialize/deserialize `ServerSignal` values for SSR → client hydration handoff.
 
 6. **Dev server / HMR**: Add a `nimble dev` task that watches `.nim` files and recompiles both server and client automatically.
-
----
-
-## How to Continue
-
-To pick up from here:
-
-```bash
-cd nimleptos
-nimble test          # verify all tests pass
-nimble client        # compile CSR example
-nimble server        # run server example
-```
-
-The most impactful next feature would be **reactive interpolation in the `buildHtml` macro** — enabling:
-```nim
-buildHtml:
-  el("p"): text($count())   # auto-wraps in createEffect + reactiveTextNode
-```

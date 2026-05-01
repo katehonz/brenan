@@ -32,12 +32,15 @@ when defined(js):
 
   proc initEventHandlers*() =
     onDOMContentLoaded(proc() =
-      hydrateApp()
+      discard hydrateApp()
       applyBindings()
     )
 else:
   type
-    EventHandler* = proc() {.closure.}
+    Event* = ref object
+      discard
+
+    EventHandler* = proc(e: Event) {.closure.}
 
   proc bindEvent*(selector, event: string, handler: EventHandler) =
     discard

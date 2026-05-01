@@ -78,6 +78,11 @@ proc renderToHtml*(node: HtmlNode): string =
 proc renderToHtmlRaw*(node: HtmlNode): string =
   if node.isText:
     return node.text
+  if node.condition != nil:
+    if node.condition():
+      return renderToHtmlRaw(node.thenBranch)
+    else:
+      return renderToHtmlRaw(node.elseBranch)
 
   result = "<" & node.tag
   for (key, value) in node.attributes:

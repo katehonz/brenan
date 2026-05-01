@@ -1,11 +1,12 @@
 # NimLeptos + NimMax — Project Status
 
-## Статус: Phase 1-11 COMPLETE
+## Статус: Phase 1-11 COMPLETE + Bug Fixes
 
 Phase 10 добави reactive DOM binding за client-side rendering и подобри HTML DSL макросите.
 Phase 11 добави WebAssembly компилация на reactive core с JS interop.
+Phase 11.1 оправи 3 критични бъга + 7 средни приоритета + добави 19 нови HTML елемента.
 
-Всички фази са реализирани и тестовете минават.
+Всички фази са реализирани и тестовете минават (40 теста, 5 suite-а).
 
 ---
 
@@ -16,13 +17,13 @@ Phase 11 добави WebAssembly компилация на reactive core с JS 
 |------|----------|
 | `subscriber.nim` | Signal[T], dependency tracking, scheduler, batch |
 | `signal.nim` | createSignal, Getter/Setter types |
-| `effects.nim` | createEffect, createMemo |
+| `effects.nim` | createEffect, createMemo (memo.value sync fix) |
 
 ### DOM (`src/nimleptos/dom/`)
 | Файл | Описание |
 |------|----------|
-| `node.nim` | HtmlNode type, renderToHtml, escapeHtml |
-| `elements.nim` | elDiv, elSpan, elP, elH1, elH2, elButton, elInput, elLabel, elForm, elA, elNav, elUl, elLi, elSection, elHeader, elFooter, text |
+| `node.nim` | HtmlNode type, renderToHtml, renderToHtmlRaw (fixed), escapeHtml |
+| `elements.nim` | 35 element builders: elDiv, elSpan, elP, elH1, elH2, elButton, elInput, elLabel, elForm, elA, elNav, elUl, elLi, elSection, elHeader, elFooter, elTextarea, elSelect, elOption, elTable, elTr, elTd, elTh, elImg, elMain, elArticle, elAside, elPre, elCode, elHead, elBody, elHtml, elScript, elStyle, elTitle, text |
 
 ### Macros (`src/nimleptos/macros/`)
 | Файл | Описание |
@@ -40,34 +41,34 @@ Phase 11 добави WebAssembly компилация на reactive core с JS 
 |------|----------|
 | `adapter.nim` | render(), renderRaw(), renderJson(), renderFragment() — bridge между NimLeptos HtmlNode и NimMax Context |
 | `app.nim` | NimLeptosApp wrapper около nimmax Application — get/post/put/delete/patch/all, use, newGroup, run |
-| `middleware.nim` | hydrationMiddleware, titleMiddleware, clientAssetsMiddleware |
+| `middleware.nim` | hydrationMiddleware(), titleMiddleware(), clientAssetsMiddleware() — функционални middleware-и |
 
 ### Routing (`src/nimleptos/routing/`)
 | Файл | Описание |
 |------|----------|
 | `route.nim` | route(), routePost(), routeGroup() — декларативни route components с LayoutComponent |
-| `layout.nim` | mainLayout(), sidebarLayout(), html5Layout() |
+| `layout.nim` | mainLayout(), sidebarLayout(), html5Layout() (fixed: използва headNodes + bodyClass) |
 
 ### Forms (`src/nimleptos/forms/`)
 | Файл | Описание |
 |------|----------|
-| `form.nim` | FormDef, FormField, renderForm(), renderFormField(), getFieldValues() |
+| `form.nim` | FormDef, FormField (fixed: textarea/select/checkbox генерират валиден HTML), renderForm(), renderFormField(), getFieldValues() |
 | `validation.nim` | NimLeptosValidator wrapping nimmax/validater — addRequired, addEmail, addMinLen, addMaxLen, addIntRange |
 | `table_helper.nim` | Workaround за nimmax TableRef[string, string] recursive override bug |
 
 ### Realtime/WebSocket (`src/nimleptos/realtime/`)
 | Файл | Описание |
 |------|----------|
-| `ws_bridge.nim` | ServerSignal[T], SignalRegistry, createServerSignal, setServerValue (push updates) |
-| `ws_handler.nim` | wsSignalRoute(), handleSignalMessage(), signalStateEndpoint() |
+| `ws_bridge.nim` | ServerSignal[T] (fixed: наследява ServerSignalBase), SignalRegistry, createServerSignal, setServerValue, broadcastToSubscribers |
+| `ws_handler.nim` | wsSignalRoute(), handleSignalMessage(), signalStateEndpoint() (fixed: broadcast вместо clear) |
 
 ### Client/JS (`src/nimleptos/client/`)
 | Файл | Описание |
 |------|----------|
 | `dom_interop.nim` | DOM manipulation via jsffi (getElementById, querySelector, addEventListener, etc.) |
 | `reactive_dom.nim` | Fine-grained reactive DOM — renderDomNode, reactiveTextNode, reactiveAttr, reactiveClass, reactiveStyle, mountApp, mountReactiveApp |
-| `hydration_client.nim` | Client-side hydration — loadHydrationData, hydrateNodes, hydrateApp |
-| `event_handlers.nim` | bindEvent, bindClick, bindSubmit, bindInput, applyBindings, initEventHandlers |
+| `hydration_client.nim` | Client-side hydration (improved: onHydrate callbacks, returns HydrationState) |
+| `event_handlers.nim` | bindEvent, bindClick, bindSubmit, bindInput, applyBindings, initEventHandlers (fixed: EventHandler type compat) |
 
 ---
 
@@ -75,11 +76,12 @@ Phase 11 добави WebAssembly компилация на reactive core с JS 
 
 | Тест | Статус |
 |------|--------|
-| `tests/all_test.nim` | PASS — 9 tests (signal, reactivity, memo, batch, HTML, SSR, hydration, escapeHtml, dependency tracking) |
-| `tests/server_test.nim` | PASS — 9 tests (app creation, render, title, fragment, route component, layout, form, validation, route group) |
-| `tests/signal_test.nim` | PASS |
-| `tests/macros_test.nim` | PASS — 9 tests (buildHtml, el macro) |
-| `tests/ssr_test.nim` | PASS |
+| `tests/signal_test.nim` | PASS — 5 tests |
+| `tests/macros_test.nim` | PASS — 12 tests |
+| `tests/ssr_test.nim` | PASS — 5 tests |
+| `tests/server_test.nim` | PASS — 9 tests |
+| `tests/all_test.nim` | PASS — 9 tests |
+| **Общо** | **40 теста, всички PASS** |
 
 ---
 
@@ -91,14 +93,24 @@ Phase 11 добави WebAssembly компилация на reactive core с JS 
 | `examples/counter_client.nim` | Client-side counter с `nim js` — reactiveTextNode, signals, DOM events |
 | `examples/timer_client.nim` | Reactive timer — setInterval + createEffect, proves dependency tracking in browser |
 | `examples/hybrid_client.nim` | Hybrid buildHtml + reactive DOM — macro DSL + fine-grained updates |
+| `examples/conditional_client.nim` | Reactive if/else в buildHtml macro |
 | `examples/server_app.nim` | NimMax server с NimLeptos rendering, routing, API endpoints |
 | `examples/wasm_reactive.nim` | Reactive core в WASM — signals + memos, контролирани от JS |
 
 ---
 
-## Известни проблеми
+## Оправени бъгове (Phase 11.1)
 
-1. **nimmax bug**: `TableRef[string, string]` override в `nimmax/core/request.nim` причинява infinite recursion за `[]`, `[]=`, `hasKey`. Workaround: `forms/table_helper.nim` създава таблицата без nimmax scope.
+| Бъг | Сериозност | Файл | Описание |
+|-----|-----------|------|----------|
+| ServerSignal type mismatch | Критичен | ws_bridge.nim | ServerSignal[T] не наследяваше ServerSignalBase → runtime crash при subscribe/unsubscribe |
+| signalUpdateEndpoint clears subscribers | Критичен | ws_handler.nim | Изчистваше subscribers вместо да broadcast-ва новата стойност |
+| Invalid form HTML | Критичен | form.nim | textarea/select/checkbox рендерираха като `<input type="textarea">` вместо правилни HTML елементи |
+| html5Layout ignores params | Среден | layout.nim | headNodes и bodyClass се приемаха но не се използваха |
+| Middleware no-ops | Среден | middleware.nim | Всички middleware-и просто викаха switch(ctx) без да правят нищо |
+| EventHandler type mismatch | Среден | event_handlers.nim | JS: proc(e: Event) vs native: proc() — несъвместими типове |
+| renderToHtmlRaw missing condition | Среден | node.nim | Не обработваше condition nodes → рендерираше `<conditional>` таг |
+| Memo.value dead data | Нисък | effects.nim | memo.value не се обновяваше след construction |
 
 ---
 
@@ -147,7 +159,7 @@ main()
 nimleptos/
 ├── src/nimleptos/
 │   ├── reactive/        # Signal system
-│   ├── dom/             # HTML node tree
+│   ├── dom/             # HTML node tree (35 element builders)
 │   ├── macros/          # Compile-time DSL
 │   ├── ssr/             # Server-side rendering
 │   ├── server/          # NimMax adapter
@@ -155,8 +167,9 @@ nimleptos/
 │   ├── forms/           # Form handling + validation
 │   ├── realtime/        # WebSocket signals
 │   └── client/          # JS hydration (nim js)
-├── tests/
-├── examples/
+├── tests/               # 5 test suites, 40 tests
+├── examples/            # 7 examples (SSR, CSR, hybrid, WASM)
+├── docs/                # 8 documentation files
 ├── nimleptos.nimble
 └── PLAN.md
 ```

@@ -41,7 +41,8 @@ proc signalUpdateEndpoint*(signalName: string): HandlerAsync =
     try:
       let data = parseJson(body)
       if data.hasKey("value"):
-        sig.subscribers = @[]
+        let rawValue = data["value"].getStr($data["value"])
+        sig.broadcastToSubscribers(rawValue)
     except:
       discard
     ctx.json(%*{"status": "ok", "signal": signalName})

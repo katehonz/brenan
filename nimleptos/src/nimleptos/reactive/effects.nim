@@ -20,6 +20,7 @@ proc createMemo*[T](compute: proc(): T {.closure.}): MemoPair[T] =
     addDependency(memo)
     if memo.dirty:
       cachedValue = memo.compute()
+      memo.value = cachedValue
       memo.dirty = false
     return cachedValue
 
@@ -28,6 +29,7 @@ proc createMemo*[T](compute: proc(): T {.closure.}): MemoPair[T] =
       let newVal = memo.compute()
       if cachedValue != newVal:
         cachedValue = newVal
+        memo.value = cachedValue
         memo.dirty = false
         notify(memo)
   )

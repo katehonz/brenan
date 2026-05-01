@@ -1,146 +1,136 @@
 # WebSocket Realtime
 
-NimLeptos supports real-time signal synchronization between server and clients via WebSocket, powered by NimMax's WebSocket module.
+Real-time signal synchronization between server and clients via WebSocket.
 
-## Server Signals
+---
 
-A `ServerSignal[T]` is a reactive value that pushes updates to connected WebSocket clients:
+## ServerSignal
 
 ```nim
 import nimleptos/realtime/ws_bridge
 
-let (onlineCount, setOnlineCount) = createServerSignal("online_users", 0)
+let (onlineCount, setOnlineCount) = createServerSignal("online", 0)
+```
 
-# Update — all subscribed clients receive the change
+`createServerSignal(name, initial)` creates a reactive value stored in a global `SignalRegistry`. Changes are pushed to all connected WebSocket subscribers.
+
+### Type Hierarchy
+
+```
+ServerSignalBase (name, subscribers)
+  └── ServerSignal[T] (value: T)
+```
+
+The registry stores `ServerSignalBase` — this allows subscribe/unsubscribe operations without knowing the generic type.
+
+---
+
+## Setting Values
+
+```nim
+# From server code
 setOnlineCount(42)
+# Automatically broadcasts {"type":"signal_update","name":"online","value":"42"}
+# to all WebSocket subscribers
 ```
 
-### ServerSignal API
-
-| Proc | Description |
-|------|-------------|
-| `createServerSignal(name, initial)` | Creates a named server signal |
-| `getServerValue(signal)` | Read current value |
-| `setServerValue(signal, value)` | Update and push to all subscribers |
-| `subscribeWs(signal, ws)` | Subscribe a WebSocket client |
-| `unsubscribeWs(signal, ws)` | Unsubscribe a WebSocket client |
-
-### Signal Registry
-
-All server signals are stored in a global registry:
+### Low-Level Broadcast
 
 ```nim
-import nimleptos/realtime/ws_bridge
-
-let registry = getRegistry()
-let state = getSignalState()  # JSON with signal names and subscriber counts
+# Broadcast raw string value to subscribers (for HTTP endpoint integration)
+signal.broadcastToSubscribers("42")
 ```
+
+---
+
+## Message Protocol
+
+### Client → Server
+
+```json
+{"type": "subscribe", "name": "online"}
+{"type": "unsubscribe", "name": "online"}
+```
+
+### Server → Client
+
+```json
+{"type": "signal_update", "name": "online", "value": "42"}
+```
+
+---
 
 ## WebSocket Handler
 
-### Route Setup
-
 ```nim
-import nimleptos
 import nimleptos/realtime/ws_handler
-import nimmax/websocket
 
-# Register the WebSocket route
+# Register WebSocket route
 app.get("/ws", wsSignalRoute())
 ```
 
-### Message Protocol
+The `wsSignalHandler` manages the WebSocket lifecycle:
+1. Performs handshake
+2. Listens for subscribe/unsubscribe messages
+3. Cleans up subscriptions on disconnect
 
-Clients send JSON messages to subscribe/unsubscribe:
+---
 
-```json
-{"type": "subscribe", "name": "online_users"}
+## HTTP Endpoints
+
+```nim
+# Update signal via HTTP POST
+app.post("/api/signals/{name}", signalUpdateEndpoint("online"))
+
+# Get signal state
+app.get("/api/signals", signalStateEndpoint())
 ```
 
-```json
-{"type": "unsubscribe", "name": "online_users"}
-```
+`signalUpdateEndpoint` parses JSON body `{"value": "42"}` and broadcasts to all subscribers.
 
-Server pushes updates:
+---
 
-```json
-{"type": "signal_update", "name": "online_users", "value": "42"}
-```
-
-### Client-Side JavaScript
+## Client-Side JavaScript
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/ws');
+const ws = new WebSocket("ws://localhost:8080/ws");
 
 ws.onopen = () => {
-  ws.send(JSON.stringify({type: 'subscribe', name: 'online_users'}));
+  ws.send(JSON.stringify({type: "subscribe", name: "online"}));
 };
 
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data);
-  if (msg.type === 'signal_update') {
-    document.getElementById('count').textContent = msg.value;
+  if (msg.type === "signal_update") {
+    document.getElementById("count").textContent = msg.value;
   }
 };
 ```
 
-## API Endpoints
+---
 
-### Signal State
+## API Reference
 
-```nim
-app.get("/api/signals", signalStateEndpoint())
-```
+| Proc | Description |
+|------|-------------|
+| `createServerSignal[T](name, initial)` | Create server-side signal |
+| `getServerValue[T](signal)` | Read current value |
+| `setServerValue[T](signal, value)` | Update and broadcast |
+| `broadcastToSubscribers(signal, value)` | Broadcast raw string |
+| `subscribeWs(signal, ws)` | Add WebSocket subscriber |
+| `unsubscribeWs(signal, ws)` | Remove WebSocket subscriber |
+| `handleSignalMessage(msg, ws)` | Process incoming WS message |
+| `getSignalState()` | Get JSON state of all signals |
+| `wsSignalRoute()` | WebSocket route handler |
+| `signalUpdateEndpoint(name)` | HTTP POST signal update |
+| `signalStateEndpoint()` | HTTP GET signal state |
 
-Returns JSON:
-```json
-{
-  "online_users": {"subscribers": 5},
-  "notifications": {"subscribers": 3}
-}
-```
-
-### Signal Update
-
-```nim
-app.post("/api/signals/{name}", signalUpdateEndpoint("name"))
-```
-
-## Integration with SSR
-
-Combine SSR and WebSocket for full-stack reactivity:
-
-```nim
-import nimleptos
-import nimleptos/realtime/ws_handler
-
-let (count, setCount) = createServerSignal("counter", 0)
-
-proc counterPage(ctx: Context): Future[HtmlNode] {.gcsafe.} =
-  result = newFuture[HtmlNode]()
-  let current = getServerValue(count)
-  complete(result,
-    elDiv([("id", "counter")],
-      elP([], text("Count: " & $current)),
-      elButton([("id", "inc-btn")], text("+"))
-    )
-  )
-
-proc main() =
-  let app = newNimLeptosApp(clientScript = "/assets/counter.js")
-
-  app.get("/", proc(ctx: Context) {.async.} =
-    ctx.render(await counterPage(ctx), app)
-  )
-
-  app.get("/ws", wsSignalRoute())
-
-  app.run()
-```
+---
 
 ## Limitations
 
-- ServerSignal values are serialized as strings in WebSocket messages
-- No built-in authentication for WebSocket connections (use NimMax middleware)
-- All connected clients receive all updates (no per-client filtering)
-- ServerSignal state is in-memory only (lost on server restart)
+- Values serialized as strings (`$value`) — complex types lose structure
+- No built-in WebSocket authentication
+- No per-client signal filtering
+- In-memory only — signals reset on server restart
+- `waitFor` in `setServerValue` blocks the event loop

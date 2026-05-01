@@ -1,173 +1,143 @@
 # Routing & Layouts
 
-NimLeptos provides declarative route components and layout composition on top of NimMax's routing engine.
+Declarative route components and layout composition on top of NimMax's routing.
 
-## Basic Routing
-
-```nim
-import nimleptos
-import nimmax
-
-# Direct handler approach
-app.get("/", proc(ctx: Context) {.async.} =
-  let node = elDiv([], text("Home"))
-  ctx.render(node, app)
-)
-```
+---
 
 ## Route Components
 
-A route component is a proc that returns `HtmlNode`:
+A route component is a proc returning `Future[HtmlNode]`:
 
 ```nim
 proc homePage(ctx: Context): Future[HtmlNode] {.gcsafe.} =
   result = newFuture[HtmlNode]()
-  complete(result,
-    elDiv([("class", "home")],
-      elH1([], text("Welcome")),
-      elP([], text("Hello, NimLeptos!"))
-    )
-  )
+  complete(result, elDiv([], text("Welcome")))
+
+app.route("/home", homePage)
 ```
 
-Register it with `route`:
+### With Layout
 
 ```nim
-app.route("/", homePage)
+app.route("/dashboard", dashboardPage, layout = mainLayout())
 ```
 
-## Route with Layout
-
-Layouts wrap page content in a common structure:
+### POST Routes
 
 ```nim
-proc dashboardPage(ctx: Context): Future[HtmlNode] {.gcsafe.} =
-  result = newFuture[HtmlNode]()
-  complete(result, elDiv([], text("Dashboard content")))
-
-let lyt: LayoutComponent = proc(ctx: Context, children: HtmlNode): Future[HtmlNode] {.gcsafe.} =
-  result = newFuture[HtmlNode]()
-  complete(result,
-    elDiv([("class", "layout")],
-      elNav([], text("Navigation")),
-      elDiv([("class", "content")], children),
-      elFooter([], text("Footer"))
-    )
-  )
-
-app.route("/dashboard", dashboardPage, layout = lyt)
+app.routePost("/login", loginHandler)
 ```
 
-## Built-in Layouts
+---
 
-### Main Layout
+## Layouts
+
+`LayoutComponent = proc(ctx: Context, children: HtmlNode): Future[HtmlNode]`
+
+Layouts wrap page content with navigation, sidebars, etc.
+
+### Built-in Layouts
+
+#### html5Layout
+
+Generates a proper HTML5 document structure:
 
 ```nim
-let nav = elNav([], text("Nav bar"))
-let footer = elFooter([], text("Footer"))
-let lyt = mainLayout(navHtml = nav, footerHtml = footer)
+app.route("/", homePage, layout = html5Layout(
+  headNodes = @[
+    elMeta([("charset", "UTF-8")]),
+    elLink([("rel", "stylesheet"), ("href", "/style.css")])
+  ],
+  bodyClass = "dark-theme"
+))
 ```
 
-### Sidebar Layout
+Output:
+```html
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body class="dark-theme">
+    <!-- page content -->
+  </body>
+</html>
+```
+
+#### mainLayout
+
+Wraps content with optional nav and footer:
+
+```nim
+let nav = elNav([], elA([("/"), text("Home")]))
+let footer = elFooter([], text("2026"))
+app.route("/about", aboutPage, layout = mainLayout(nav, footer))
+```
+
+Output: `<div class="layout"><nav>...</nav><!-- content --><footer>...</footer></div>`
+
+#### sidebarLayout
+
+Two-column layout with sidebar:
 
 ```nim
 let sidebar = elDiv([], text("Sidebar"))
-let lyt = sidebarLayout(sidebar)
+app.route("/settings", settingsPage, layout = sidebarLayout(sidebar))
 ```
 
-Result structure:
-```html
-<div class="sidebar-layout">
-  <div class="sidebar">Sidebar</div>
-  <div class="main-content">{page content}</div>
-</div>
-```
+Output: `<div class="sidebar-layout"><div class="sidebar">...</div><div class="main-content">...</div></div>`
 
-## LayoutComponent Type
-
-```nim
-type
-  LayoutComponent* = proc(ctx: Context, children: HtmlNode): Future[HtmlNode] {.gcsafe.}
-```
-
-A layout receives the NimMax `Context` and the page's `HtmlNode` as children, and returns a wrapped `HtmlNode`.
+---
 
 ## Route Groups
 
-Group routes with shared prefix and middleware:
+Groups share a URL prefix and optional middleware:
 
 ```nim
 let api = app.newGroup("/api/v1")
 api.get("/users", listUsers)
-api.post("/users", createUser)
 api.get("/users/{id}", getUser)
+api.post("/users", createUser)
 ```
 
-With middleware:
-
-```nim
-let admin = app.newGroup("/admin", middlewares = @[authMiddleware()])
-admin.get("/dashboard", adminDashboard)
-```
+---
 
 ## Named Routes
 
 ```nim
-app.get("/user/{id}", userHandler, name = "user_detail")
-
-# Build URL
-let url = ctx.urlFor("user_detail", @[("id", "42")])
-# Returns: "/user/42"
+app.route("/users/{id}", getUser, name = "user.show")
+let url = ctx.urlFor("user.show", {"id": "42"})
+# → "/users/42"
 ```
 
-## Route Parameters
-
-```nim
-proc userHandler(ctx: Context) {.async.} =
-  let id = ctx.getPathParam("id")
-  let node = elDiv([], text("User: " & id))
-  ctx.render(node, app)
-```
-
-### Typed Parameters
-
-```nim
-proc productHandler(ctx: Context) {.async.} =
-  let id = ctx.getInt("id")           # Option[int]
-  let price = ctx.getFloat("price")   # Option[float]
-
-  if id.isSome:
-    ctx.render(elDiv([], text("Product " & $id.get)), app)
-  else:
-    ctx.abortRequest(Http400, "Invalid ID")
-```
-
-## POST Routes
-
-```nim
-app.routePost("/submit", proc(ctx: Context): Future[HtmlNode] {.gcsafe.} =
-  result = newFuture[HtmlNode]()
-  let name = ctx.getPostParam("name")
-  complete(result, elDiv([], text("Hello, " & name)))
-)
-```
+---
 
 ## HTTP Methods
 
 | Proc | Method |
 |------|--------|
-| `app.get` | GET |
-| `app.post` | POST |
-| `app.put` | PUT |
-| `app.delete` | DELETE |
-| `app.patch` | PATCH |
-| `app.all` | All methods |
+| `app.get(path, handler)` | GET |
+| `app.post(path, handler)` | POST |
+| `app.put(path, handler)` | PUT |
+| `app.delete(path, handler)` | DELETE |
+| `app.patch(path, handler)` | PATCH |
+| `app.all(path, handler)` | All methods |
 
-## Wildcard Routes
+---
+
+## Custom Layouts
 
 ```nim
-app.get("/files/*", proc(ctx: Context) {.async.} =
-  let filePath = ctx.getPathParam("*")
-  ctx.text("File: " & filePath)
-)
+proc myLayout*(headNodes: seq[HtmlNode] = @[]): LayoutComponent =
+  result = proc(ctx: Context, children: HtmlNode): Future[HtmlNode] {.gcsafe.} =
+    result = newFuture[HtmlNode]()
+    complete(result, elHtml([],
+      elHead([], headNodes),
+      elBody([("class", "my-app")],
+        elHeader([], text("Header")),
+        children,
+        elFooter([], text("Footer"))
+      )
+    ))
 ```

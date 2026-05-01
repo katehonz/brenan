@@ -1,97 +1,120 @@
 # Server-Side Rendering (SSR)
 
-NimLeptos renders HTML on the server and injects hydration markers so the client can attach interactivity without re-rendering.
+Renders HTML on the server with hydration markers for client-side interactivity.
+
+---
 
 ## SSRContext
 
-The `SSRContext` tracks hydration IDs, scripts, and styles for a render pass:
-
 ```nim
-import nimleptos/ssr/renderer
-
 let ctx = newSSRContext()
-ctx.addScript("/assets/app.js")
-ctx.addStyle("body { margin: 0; }")
 ```
 
-### Rendering a Full Page
+Tracks hydration IDs, scripts, and styles for the current render.
+
+### Adding Assets
 
 ```nim
-let body = elDiv([("class", "app")],
-  elH1([], text("Hello")),
-  elP([], text("World"))
-)
+ctx.addScript("/app.js")
+ctx.addStyle("/app.css")
+```
 
+---
+
+## Rendering
+
+### Full Page
+
+```nim
+let body = elDiv([("class", "app")], text("Hello"))
 let html = renderFullPage(ctx, body, "My Page")
-# Returns: <!DOCTYPE html><html><head><title>My Page</title>...</head><body>...</body></html>
 ```
 
-### Rendering with Hydration IDs
-
-```nim
-import nimleptos/ssr/hydration
-
-let ctx = newSSRContext()
-let root = elDiv([("class", "app")],
-  elH1([], text("Title")),
-  elP([], text("Content"))
-)
-
-let html = renderWithHydration(root, ctx)
-# Each element gets data-nl-id="N" attributes
-# <div class="app" data-nl-id="0"><h1 data-nl-id="1">Title</h1><p data-nl-id="2">Content</p></div>
+Output:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Page</title>
+  <script type="application/json" id="__nimleptos_data__">{"nextId":5}</script>
+</head>
+<body>
+  <div class="app" data-nl-id="0">Hello</div>
+</body>
+</html>
 ```
 
-### Injecting Hydration IDs Manually
+### With Hydration IDs
 
 ```nim
-let ctx = newSSRContext()
 let root = elDiv([], elSpan([], text("child")))
 discard injectHydrationIds(root, ctx)
-
-echo ctx.nextId  # 2 (root=0, span=1)
+# root gets data-nl-id="0", child span gets data-nl-id="1"
 ```
 
-## SSRContext API
+### Render with Hydration
 
-| Proc | Description |
-|------|-------------|
-| `newSSRContext()` | Creates a new SSR context |
-| `nextMarkerId(ctx)` | Returns and increments the next hydration ID |
-| `addMarker(ctx, marker)` | Registers a hydration marker |
-| `addScript(ctx, url)` | Adds a `<script>` tag to the page |
-| `addStyle(ctx, css)` | Adds a `<style>` tag to the page |
-| `renderHead(ctx, title)` | Renders `<head>` with title, styles |
-| `renderHydrationData(ctx)` | Renders `__nimleptos_data__` JSON + scripts |
-| `renderFullPage(ctx, body, title)` | Renders complete HTML page |
-| `renderPageWithHydration(ctx, body, title)` | Injects IDs then renders full page |
+```nim
+let html = renderWithHydration(root, ctx)
+# Same as renderToHtml but with data-nl-id attributes injected
+```
+
+### Full Page with Hydration
+
+```nim
+let html = renderPageWithHydration(ctx, body, "Title")
+# Combines injectHydrationIds + renderFullPage
+```
+
+### Hydration Script
+
+```nim
+let script = generateHydrationScript()
+# Returns JS that assigns __nimleptos_id to hydrated nodes
+```
+
+---
+
+## Integration with NimLeptosApp
+
+```nim
+let app = newNimLeptosApp(title = "My App")
+
+app.get("/", proc(ctx: Context) {.async.} =
+  let node = elDiv([], text("Hello"))
+  ctx.render(node, app, "Home")
+)
+```
+
+`ctx.render(node, app, title)` internally:
+1. Creates SSRContext
+2. Injects hydration IDs
+3. Renders full HTML page
+4. Sends HTML response
+
+### Fragment Rendering
+
+```nim
+app.get("/fragment", proc(ctx: Context) {.async.} =
+  let node = elSpan([], text("Partial"))
+  ctx.renderFragment(node)  # No DOCTYPE/head, just the HTML
+)
+```
+
+---
 
 ## Hydration Data
 
-The SSR renderer injects a JSON blob that the client reads on load:
+The `<script id="__nimleptos_data__">` element contains JSON with:
+- `nextId` — the next hydration ID to assign
 
-```html
-<script type="application/json" id="__nimleptos_data__">{"nextId":8}</script>
-```
+Client-side `hydration_client.nim` reads this on load to track hydrated nodes.
 
-The client reads this to know how many hydration markers exist and to restore state.
+---
 
-## Integration with NimMax
+## Performance
 
-```nim
-import nimleptos
-import nimmax
-
-proc handler(ctx: Context) {.async.} =
-  let node = elDiv([], text("Hello"))
-  ctx.render(node, title = "My Page")  # renders full page with hydration
-```
-
-The `render` proc on NimMax `Context` creates an `SSRContext`, injects hydration IDs, and sends the HTML response.
-
-## Performance Notes
-
-- SSR renders the full HTML string on the server — no virtual DOM overhead
-- Hydration IDs add minimal bytes (`data-nl-id="N"`)
-- The `__nimleptos_data__` JSON is typically < 100 bytes
-- Static content (no signals) can skip hydration IDs with `renderToHtml`
+- No virtual DOM overhead
+- Hydration IDs add minimal bytes per element
+- Static content can skip hydration with `renderToHtml` or `renderFragment`
+- Streaming support via NimMax's async response

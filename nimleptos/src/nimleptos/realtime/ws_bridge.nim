@@ -5,30 +5,29 @@ import std/asyncdispatch
 import std/json
 
 type
-  ServerSignal*[T] = ref object
+  ServerSignalBase* = ref object of RootObj
     name*: string
-    value*: T
     subscribers*: seq[WebSocket]
+
+  ServerSignal*[T] = ref object of ServerSignalBase
+    value*: T
 
   SignalRegistry* = ref object
     signals*: Table[string, ServerSignalBase]
-
-  ServerSignalBase* = ref object of RootObj
 
 var globalRegistry = SignalRegistry(signals: initTable[string, ServerSignalBase]())
 
 proc getRegistry*(): SignalRegistry = globalRegistry
 
 proc createServerSignal*[T](name: string, initial: T): ServerSignal[T] =
-  result = ServerSignal[T](name: name, value: initial, subscribers: @[])
+  result = ServerSignal[T](name: name, value: initial)
   globalRegistry.signals[name] = result
 
 proc getServerValue*[T](signal: ServerSignal[T]): T =
   signal.value
 
-proc setServerValue*[T](signal: ServerSignal[T], value: T) =
-  signal.value = value
-  let msg = %*{"type": "signal_update", "name": signal.name, "value": $value}
+proc broadcastToSubscribers*(signal: ServerSignalBase, value: string) =
+  let msg = %*{"type": "signal_update", "name": signal.name, "value": value}
   var toRemove: seq[int] = @[]
   for i, ws in signal.subscribers:
     try:
@@ -37,6 +36,10 @@ proc setServerValue*[T](signal: ServerSignal[T], value: T) =
       toRemove.add(i)
   for i in countdown(toRemove.len - 1, 0):
     signal.subscribers.delete(toRemove[i])
+
+proc setServerValue*[T](signal: ServerSignal[T], value: T) =
+  signal.value = value
+  signal.broadcastToSubscribers($value)
 
 proc subscribeWs*[T](signal: ServerSignal[T], ws: WebSocket) =
   signal.subscribers.add(ws)

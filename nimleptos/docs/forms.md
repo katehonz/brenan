@@ -1,97 +1,76 @@
 # Forms & Validation
 
-NimLeptos provides declarative form rendering and integration with NimMax's validation system.
+Declarative form rendering integrated with NimMax's validation system.
 
-## Form Definition
+---
+
+## FormDef
 
 ```nim
-import nimleptos/forms/form
-
-let form = newFormDef("/register")
-form.addField("name", "Full Name", required = true)
-form.addField("email", "Email Address", kind = "email", required = true)
+let form = newFormDef("/submit")
+form.addField("name", "Your Name", required = true)
+form.addField("email", "Email", kind = "email", required = true)
+form.addField("bio", "Biography", kind = "textarea")
+form.addField("country", "Country", kind = "select",
+  options = @[("us", "USA"), ("bg", "Bulgaria"), ("uk", "UK")])
+form.addField("agree", "I agree", kind = "checkbox")
 form.addField("age", "Age", kind = "number")
-form.addField("password", "Password", kind = "password", required = true)
+form.addField("password", "Password", kind = "password")
 ```
-
-### FormDef
-
-| Proc | Description |
-|------|-------------|
-| `newFormDef(action, httpMethod)` | Creates a form with action URL and method |
-| `addField(name, label, kind, value, required, attrs)` | Adds a form field |
-| `renderForm(form)` | Renders the form as `HtmlNode` |
-| `renderFormField(field)` | Renders a single field |
-| `getFieldValues(ctx, form)` | Extracts POST values as `seq[(string, string)]` |
-| `populateForm(form, ctx)` | Fills field values from POST data |
-| `setFieldError(form, field, error)` | Adds an error to a field |
-| `hasErrors(form)` | Returns true if any field has errors |
 
 ### Field Types
 
-The `kind` parameter maps to HTML input types:
+| Kind | Renders As | Notes |
+|------|-----------|-------|
+| `text` (default) | `<input type="text">` | Default |
+| `email` | `<input type="email">` | |
+| `password` | `<input type="password">` | |
+| `number` | `<input type="number">` | |
+| `textarea` | `<textarea>` | Multi-line text |
+| `select` | `<select>` with `<option>` | Requires `options` parameter |
+| `checkbox` | `<input type="checkbox">` | `value="true"` → checked |
+
+### Select Options
+
+For `select` fields, pass `options` as `seq[(value, label)]`:
 
 ```nim
-form.addField("name", "Name", kind = "text")
-form.addField("email", "Email", kind = "email")
-form.addField("age", "Age", kind = "number")
-form.addField("password", "Password", kind = "password")
-form.addField("bio", "Bio", kind = "textarea")
-form.addField("country", "Country", kind = "select")
-form.addField("agree", "I agree", kind = "checkbox")
+form.addField("role", "Role", kind = "select",
+  options = @[
+    ("admin", "Administrator"),
+    ("editor", "Editor"),
+    ("viewer", "Viewer")
+  ])
 ```
 
-### Custom Attributes
+### Checkbox
+
+Checkbox fields use `value` to determine checked state: `"true"`, `"on"`, or `"1"` → checked.
+
+---
+
+## Rendering
 
 ```nim
-form.addField("phone", "Phone",
-  kind = "tel",
-  attrs = @[("pattern", "[0-9]+"), ("placeholder", "+359...")]
-)
+let html = renderForm(form)   # returns HtmlNode
+let rendered = renderToHtml(html)  # returns string
 ```
 
-## Rendering Forms
-
-```nim
-let html = renderForm(form)
-echo renderToHtml(html)
-```
-
-Output:
+Each field renders as:
 ```html
 <div class="form-field">
-  <label for="name">Full Name</label>
+  <label for="name">Your Name</label>
   <input type="text" name="name" id="name" required="required">
-</div>
-<div class="form-field">
-  <label for="email">Email Address</label>
-  <input type="email" name="email" id="email" required="required">
-</div>
-...
-<button type="submit">Submit</button>
-```
-
-### With Errors
-
-After validation fails, fields display errors:
-
-```html
-<div class="form-field">
-  <label for="email">Email</label>
-  <input type="email" name="email" id="email">
-  <span class="field-error">Must be a valid email address</span>
+  <span class="field-error">Error message</span>  <!-- if errors -->
 </div>
 ```
+
+---
 
 ## Validation
 
-NimLeptos wraps NimMax's `FormValidator`:
-
 ```nim
-import nimleptos/forms/validation
-
 let v = newNimLeptosValidator()
-v.addRequired("name", "Name")
 v.addRequired("email", "Email")
 v.addEmail("email", "Email")
 v.addMinLen("password", 8, "Password")
@@ -104,97 +83,46 @@ v.addIntRange("age", 0, 150, "Age")
 ```nim
 app.post("/register", proc(ctx: Context) {.async.} =
   let form = newFormDef("/register")
-  form.addField("name", "Name")
-  form.addField("email", "Email")
-  form.addField("password", "Password")
+  form.addField("email", "Email", kind = "email")
+  form.addField("password", "Password", kind = "password")
+
+  populateForm(form, ctx)  # fill values from POST data
 
   let values = getFieldValues(ctx, form)
-
   if not v.validateFormFields(form, values):
-    # Re-render form with errors
-    let html = renderForm(form)
-    ctx.render(html, app, "Register - Error")
+    ctx.render(renderForm(form), app, "Register")
     return
 
-  # Success
+  # Process valid form...
   ctx.redirect("/welcome")
 )
 ```
 
-### Available Validators
-
-| Validator | Description |
-|-----------|-------------|
-| `addRequired(field, label)` | Field must not be empty |
-| `addEmail(field, label)` | Must be valid email |
-| `addMinLen(field, n, label)` | Minimum string length |
-| `addMaxLen(field, n, label)` | Maximum string length |
-| `addIntRange(field, min, max, label)` | Integer in range |
-
-### Raw NimMax Validators
-
-Access all NimMax validators directly:
+### Manual Error Setting
 
 ```nim
-import nimmax/validater
-
-v.addRule("url", isUrl())
-v.addRule("flag", isBool())
-v.addRule("code", matchPattern(r"^[A-Z]{3}$"))
-v.addRule("role", oneOf(@["admin", "user", "guest"]))
-v.addRule("confirm", equals(passwordValue))
+form.setFieldError("email", "Email already taken")
+if form.hasErrors():
+  # Re-render form with errors
 ```
 
-## Complete Example
+---
 
-```nim
-import nimleptos
-import nimmax
+## API Reference
 
-let v = newNimLeptosValidator()
-v.addRequired("username", "Username")
-v.addMinLen("username", 3, "Username")
-v.addRequired("email", "Email")
-v.addEmail("email", "Email")
-v.addRequired("password", "Password")
-v.addMinLen("password", 8, "Password")
+| Proc | Description |
+|------|-------------|
+| `newFormDef(action, httpMethod)` | Create form definition |
+| `addField(name, label, kind, value, required, attrs, options)` | Add field |
+| `renderFormField(field)` | Render single field to HtmlNode |
+| `renderForm(form)` | Render complete form |
+| `getFieldValues(ctx, form)` | Extract POST values |
+| `populateForm(form, ctx)` | Fill form from POST data |
+| `setFieldError(form, fieldName, error)` | Add error to field |
+| `hasErrors(form)` | Check if form has errors |
 
-proc registerForm(): HtmlNode =
-  let form = newFormDef("/register")
-  form.addField("username", "Username", required = true)
-  form.addField("email", "Email", kind = "email", required = true)
-  form.addField("password", "Password", kind = "password", required = true)
-  renderForm(form)
-
-proc main() =
-  let app = newNimLeptosApp(title = "Register")
-
-  app.get("/register", proc(ctx: Context) {.async.} =
-    ctx.render(registerForm(), app, "Register")
-  )
-
-  app.post("/register", proc(ctx: Context) {.async.} =
-    let form = newFormDef("/register")
-    form.addField("username", "Username")
-    form.addField("email", "Email")
-    form.addField("password", "Password")
-
-    let values = getFieldValues(ctx, form)
-
-    if not v.validateFormFields(form, values):
-      ctx.render(renderForm(form), app, "Register - Error")
-      return
-
-    ctx.redirect("/login")
-  )
-
-  app.run()
-
-main()
-```
+---
 
 ## TableRef Workaround
 
-NimLeptos uses `forms/table_helper.nim` to work around a nimmax bug where `TableRef[string, string]` operations (`[]`, `[]=`, `hasKey`) cause infinite recursion. The `newFormData` proc creates the table in a scope where nimmax's overrides are not active.
-
-This is transparent to users — just use `getFieldValues` and `validateFormFields`.
+`forms/table_helper.nim` works around a nimmax bug where `TableRef[string, string]` operations cause infinite recursion. Uses `newFormData`, `lookupValue`, `formDataLen` helpers.

@@ -11,6 +11,7 @@ type
     errors*: seq[string]
     required*: bool
     attrs*: seq[(string, string)]
+    options*: seq[(string, string)]
 
   FormDef* = ref object
     fields*: seq[FormField]
@@ -22,22 +23,60 @@ proc newFormDef*(action: string, httpMethod = "POST"): FormDef =
   FormDef(fields: @[], action: action, httpMethod: httpMethod, attrs: @[])
 
 proc addField*(form: FormDef, name: string, label: string, kind = "text",
-               value = "", required = false, attrs: seq[(string, string)] = @[]) =
+               value = "", required = false, attrs: seq[(string, string)] = @[],
+               options: seq[(string, string)] = @[]) =
   form.fields.add(FormField(
     name: name, label: label, kind: kind, value: value,
-    errors: @[], required: required, attrs: attrs
+    errors: @[], required: required, attrs: attrs, options: options
   ))
 
 proc renderFormField*(field: FormField): HtmlNode =
   let labelNode = elLabel([("for", field.name)], text(field.label))
-  var inputAttrs = @[("type", field.kind), ("name", field.name), ("id", field.name)]
-  if field.value.len > 0:
-    inputAttrs.add(("value", field.value))
-  if field.required:
-    inputAttrs.add(("required", "required"))
-  for (k, v) in field.attrs:
-    inputAttrs.add((k, v))
-  let inputNode = elInput(inputAttrs)
+  var inputNode: HtmlNode
+
+  case field.kind
+  of "textarea":
+    var textareaAttrs = @[("name", field.name), ("id", field.name)]
+    if field.required:
+      textareaAttrs.add(("required", "required"))
+    for (k, v) in field.attrs:
+      textareaAttrs.add((k, v))
+    inputNode = elTextarea(textareaAttrs, text(field.value))
+
+  of "select":
+    var selectAttrs = @[("name", field.name), ("id", field.name)]
+    if field.required:
+      selectAttrs.add(("required", "required"))
+    for (k, v) in field.attrs:
+      selectAttrs.add((k, v))
+    var optionNodes: seq[HtmlNode] = @[]
+    for (optVal, optLabel) in field.options:
+      var optAttrs = @[("value", optVal)]
+      if optVal == field.value:
+        optAttrs.add(("selected", "selected"))
+      optionNodes.add(elOption(optAttrs, text(optLabel)))
+    inputNode = elSelect(selectAttrs, optionNodes)
+
+  of "checkbox":
+    var cbAttrs = @[("type", "checkbox"), ("name", field.name), ("id", field.name)]
+    if field.value == "true" or field.value == "on" or field.value == "1":
+      cbAttrs.add(("checked", "checked"))
+    if field.required:
+      cbAttrs.add(("required", "required"))
+    for (k, v) in field.attrs:
+      cbAttrs.add((k, v))
+    inputNode = elInput(cbAttrs)
+
+  else:
+    var inputAttrs = @[("type", field.kind), ("name", field.name), ("id", field.name)]
+    if field.value.len > 0:
+      inputAttrs.add(("value", field.value))
+    if field.required:
+      inputAttrs.add(("required", "required"))
+    for (k, v) in field.attrs:
+      inputAttrs.add((k, v))
+    inputNode = elInput(inputAttrs)
+
   var children: seq[HtmlNode] = @[labelNode, inputNode]
   for err in field.errors:
     children.add(elSpan([("class", "field-error")], text(err)))

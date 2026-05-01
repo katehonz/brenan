@@ -1,199 +1,190 @@
 # NimMax Integration
 
-NimLeptos uses [NimMax](https://github.com/katehonz/nimmax) as its HTTP backend. This document covers how the two frameworks connect.
+NimLeptos uses [NimMax](https://github.com/katehonz/nimmax) as its HTTP backend.
 
-## Quick Start
-
-```nim
-import nimleptos
-import nimmax
-
-proc main() =
-  let app = newNimLeptosApp(
-    settings = newSettings(address = "0.0.0.0", port = Port(8080)),
-    title = "My App"
-  )
-
-  app.use(loggingMiddleware())
-
-  app.get("/", proc(ctx: Context) {.async.} =
-    let node = elDiv([("class", "app")],
-      elH1([], text("Hello NimLeptos!"))
-    )
-    ctx.render(node, app, "Home")
-  )
-
-  app.run()
-
-main()
-```
+---
 
 ## NimLeptosApp
 
-`NimLeptosApp` wraps NimMax's `Application` and adds SSR context:
+Wraps NimMax's `Application` with SSR context:
 
 ```nim
 let app = newNimLeptosApp(
-  settings = newSettings(port = Port(3000)),
-  title = "Default Title",
-  clientScript = "/assets/app.js",
-  clientStyle = "/assets/app.css"
+  title = "My App",
+  clientScript = "/app.js",
+  clientStyle = "/app.css"
 )
 ```
 
-### Routing
+### Constructor Parameters
 
-All NimMax routing features are available:
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `settings` | `newSettings()` | NimMax server settings |
+| `title` | `"NimLeptos App"` | Default page title |
+| `clientScript` | `""` | Client JS bundle path |
+| `clientStyle` | `""` | Client CSS path |
+
+---
+
+## Routing
 
 ```nim
-# Basic routes
-app.get("/about", handler)
-app.post("/submit", handler)
-app.put("/update", handler)
-app.delete("/remove", handler)
+app.get("/about", aboutHandler)
+app.post("/submit", submitHandler)
+app.put("/api/users/{id}", updateUser)
+app.delete("/api/users/{id}", deleteUser)
+app.patch("/api/users/{id}", patchUser)
+app.all("/catch-all", handler)
+```
 
-# Route groups
+### Route Components
+
+```nim
+app.route("/home", homePage, layout = mainLayout())
+```
+
+### Groups
+
+```nim
 let api = app.newGroup("/api/v1")
 api.get("/users", listUsers)
 api.post("/users", createUser)
-api.get("/users/{id}", getUser)
-
-# Named routes
-app.get("/user/{id}", handler, name = "user_detail")
-let url = ctx.urlFor("user_detail", @[("id", "42")])
 ```
 
-### Middleware
-
-Use NimMax middleware directly:
-
-```nim
-import nimmax/middlewares
-
-app.use(loggingMiddleware())
-app.use(corsMiddleware())
-app.use(csrfMiddleware())
-app.use(sessionMiddleware(backend = sbMemory))
-app.use(rateLimitMiddleware(limiter))
-```
+---
 
 ## Rendering
 
-### Full Page Render
+| Proc | Description |
+|------|-------------|
+| `ctx.render(node, app, title)` | Full page with hydration markers |
+| `ctx.renderFragment(node)` | Raw HTML, no wrapper |
+| `ctx.json(data)` | JSON response |
+| `ctx.html(str)` | Raw HTML string |
+
+---
+
+## Middleware
+
+NimLeptos provides functional middleware that integrates with the SSR pipeline:
+
+### hydrationMiddleware
+
+Sets `__hydration_enabled__` context flag for downstream handlers:
 
 ```nim
-proc handler(ctx: Context) {.async.} =
-  let node = elDiv([], text("Hello"))
-  ctx.render(node, app, "Page Title")
+app.use(hydrationMiddleware())
 ```
 
-### Fragment Render (no hydration)
+### titleMiddleware
+
+Sets a default page title that can be overridden per-route:
 
 ```nim
-proc handler(ctx: Context) {.async.} =
-  let node = elSpan([("id", "status")], text("Updated"))
-  ctx.renderFragment(node)  # sends raw HTML, no wrapper
+app.use(titleMiddleware("My App"))
 ```
 
-### JSON Response
+### clientAssetsMiddleware
+
+Registers client-side scripts and styles:
 
 ```nim
-proc apiHandler(ctx: Context) {.async.} =
-  ctx.json(%*{"status": "ok"})
+app.use(clientAssetsMiddleware(script = "/app.js", style = "/app.css"))
 ```
 
-### HTML String Response
+### NimMax Middleware
+
+All NimMax middleware works directly:
 
 ```nim
-proc handler(ctx: Context) {.async.} =
-  ctx.html("<h1>Raw HTML</h1>")
+import nimmax/middleware/logging
+import nimmax/middleware/cors
+
+app.use(loggingMiddleware())
+app.use(corsMiddleware(allowOrigin = "*"))
 ```
 
-## Route Components
-
-Define components that return `HtmlNode`:
-
-```nim
-proc homePage(ctx: Context): Future[HtmlNode] {.gcsafe.} =
-  result = newFuture[HtmlNode]()
-  complete(result, elDiv([("class", "home")],
-    elH1([], text("Welcome")),
-    elP([], text("This is the home page"))
-  ))
-```
-
-Use with `route`:
-
-```nim
-app.route("/", homePage)
-
-# With layout
-app.route("/dashboard", dashboardPage, layout = mainLayout())
-```
+---
 
 ## Context Data
 
-NimMax's `Context` carries request data:
+### Path Parameters
 
 ```nim
-proc handler(ctx: Context) {.async.} =
-  let id = ctx.getPathParam("id")           # /user/{id}
-  let page = ctx.getQueryParam("page")      # ?page=2
-  let name = ctx.getPostParam("name")       # form POST
-  let token = ctx.getCookie("session")      # cookie
-  let auth = ctx.request.headers["Authorization"]  # header
+let id = ctx.getPathParam("id")
+let idInt = ctx.getInt("id")
 ```
 
-### Typed Parameters
+### Query Parameters
 
 ```nim
-let userId = ctx.getInt("id")         # Option[int]
-let price = ctx.getFloat("price")     # Option[float]
-let active = ctx.getBool("active")    # Option[bool]
+let page = ctx.getQueryParam("page", "1")
 ```
+
+### POST Data
+
+```nim
+let email = ctx.getPostParam("email")
+```
+
+### Cookies
+
+```nim
+let session = ctx.getCookie("session_id")
+ctx.setCookie("session_id", "abc123")
+```
+
+---
 
 ## Sessions
 
 ```nim
-app.use(sessionMiddleware(backend = sbMemory, maxAge = 86400))
+import nimmax/middleware/session
 
-proc login(ctx: Context) {.async.} =
-  ctx.session["user"] = "alice"
-  ctx.session["role"] = "admin"
+app.use(sessionMiddleware("secret-key"))
 
-proc profile(ctx: Context) {.async.} =
-  let user = ctx.session["user"]
-  ctx.render(elDiv([], text("Hello, " & user)), app)
+# In handler:
+ctx.setSession("user_id", "42")
+let userId = ctx.getSession("user_id")
 ```
+
+---
 
 ## Error Handling
 
 ```nim
 app.registerErrorHandler(Http404, proc(ctx: Context) {.async.} =
-  ctx.render(elDiv([], text("404 Not Found")), app, "404")
-)
-
-app.registerErrorHandler(Http500, proc(ctx: Context) {.async.} =
-  ctx.render(elDiv([], text("Server Error")), app, "500")
+  ctx.html("<h1>404 Not Found</h1>")
 )
 ```
 
-## Testing with NimMax Mocking
+---
+
+## Testing
 
 ```nim
 import nimmax/mocking
 
-let app = mockApp()
-app.get("/", proc(ctx: Context) {.async.} =
-  ctx.render(elDiv([], text("Hello")))
-)
-
-let ctx = app.runOnce(HttpGet, "/")
-assert ctx.response.code == Http200
-assert ctx.response.body.contains("Hello")
+let testApp = mockApp()
+testApp.get("/", handler)
+let ctx = testApp.runOnce(HttpGet, "/")
+doAssert ctx.response.code == Http200
 ```
 
-## Startup/Shutdown Events
+---
+
+## Static Files
+
+```nim
+import nimmax/middleware/static
+
+app.use(staticFiles("public"))
+```
+
+---
+
+## Lifecycle Events
 
 ```nim
 app.onStart(proc() =
@@ -201,25 +192,14 @@ app.onStart(proc() =
 )
 
 app.onStop(proc() =
-  echo "Server shutting down..."
+  echo "Server stopping..."
 )
 ```
 
-## Static Files
+---
+
+## Running
 
 ```nim
-app.use(staticFileMiddleware("public"))
+app.run(address = "0.0.0.0", port = Port(8080), debug = true)
 ```
-
-## NimMax Modules Used
-
-| Module | Purpose |
-|--------|---------|
-| `nimmax` | Core types, routing, context, application |
-| `nimmax/middlewares` | CSRF, CORS, sessions, logging, compression |
-| `nimmax/validater` | Form validation (15+ validators) |
-| `nimmax/websocket` | WebSocket support |
-| `nimmax/mocking` | Testing utilities |
-| `nimmax/security` | Signing, password hashing |
-| `nimmax/cache` | LRU/LFU caching |
-| `nimmax/configure` | .env, JSON config |
