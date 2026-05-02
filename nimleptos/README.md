@@ -19,6 +19,10 @@ A full-stack reactive web framework for Nim, inspired by [Leptos](https://leptos
 - **HTML DSL Macros** — `buildHtml`, `html`, and `el()` macros with reactive interpolation and inline event handlers (`onClick`, `onInput`, etc.)
 - **Type-Safe** — Full Nim type system, `Option[T]` for safe parameter access
 
+- **JWT Authentication** — HMAC/RSA/ECDSA signing via BearSSL, Bearer token middleware, refresh tokens, role-based access
+- **Component System** — `view` macro with typed props, children/slots, `ComponentChildren`
+- **SSR State Handoff** — Server initializes client state via `addInitialState` → `getInitialValue`
+
 ## Quick Start
 
 ### Prerequisites
@@ -279,21 +283,96 @@ app.get("/ws", wsSignalRoute())
 setOnlineCount(42)
 ```
 
+## JWT Authentication
+
+Powered by [jwt-nim-baraba](https://github.com/katehonz/jwt-nim-baraba) (HS256/RS256/ES256 via BearSSL).
+
+```nim
+import nimleptos/server/auth
+
+setJwtSecret("your-256-bit-secret")
+
+# Middleware — extracts Bearer token, sets auth context
+app.use(jwtAuthMiddleware())
+
+# Protect routes by role/permission
+app.get("/admin", adminHandler, middlewares = @[requireAuth(), requireRole("admin")])
+app.get("/api/invoices", listInvoices, middlewares = @[requireAuth(), requirePermission("read:invoices")])
+
+# Login endpoint — returns access_token + refresh_token
+type LoginChecker = proc(username, password: string): AuthUser {.gcsafe.}
+app.post("/api/login", loginHandler(checkCredentials))
+
+# Token refresh
+app.post("/api/refresh", refreshHandler())
+
+# Usage in route handler
+proc adminHandler(ctx: Context) {.async.} =
+  let user = extractAuthUser(ctx)
+  ctx.json(%*{"message": "Hello " & user.username})
+```
+
+| Feature | Description |
+|---------|-------------|
+| `jwtAuthMiddleware()` | Bearer token extraction, HMAC verification, context population |
+| `loginHandler()` | Credential check → JWT creation with access + refresh tokens |
+| `refreshHandler()` | Refresh token validation → new access token |
+| `requireAuth()` | Gate middleware: redirects unauthenticated users |
+| `requireRole(role)` | Gate middleware: 403 if insufficient role |
+| `requirePermission(perm)` | Gate middleware: 403 if insufficient permission |
+| `isAuthenticated(ctx)` | Check if user in request context |
+| `hasRole(ctx, role)` | Check user role |
+| `hasPermission(ctx, perm)` | Check user permission |
+| `createAccessToken(user)` | Create JWT with claims (sub, username, role, perms, iat, exp) |
+| `verifyToken(token)` | Parse + verify → AuthUser or nil |
+| `setJwtConfig()` | Configure secret, access/refresh expiry, issuer |
+
+## Component System
+
+```nim
+import nimleptos/macros/view_macros
+
+proc Card(title: string, children: ComponentChildren = noChildren()): HtmlNode =
+  buildHtml:
+    el("div", class="card"):
+      el("h3"): text(title)
+      el("div", class="card-body"): renderSlot(children)
+
+# Invoke with children via `view` macro
+let page = view Card(title="Invoice #42"):
+  el("p"): text("Amount: 1500 BGN")
+  el("button", onClick=proc(e: auto) = discard): text("Pay")
+```
+
+Helpers: `slot()`, `renderSlot()`, `noChildren()`, `ComponentChildren`
+
+## SSR → Client State Handoff
+
+```nim
+# Server: store initial data in SSR context
+ctx.ssrCtx.addInitialState("invoices", $invoicesJson)
+ctx.ssrCtx.addInitialState("userRole", "accountant")
+
+# Client: read back after hydration
+import nimleptos/client/hydration_client
+let invoices = getInitialValue("invoices", "[]")
+let role = getInitialValue("userRole", "viewer")
+
 ## Project Structure
 
 ```
 nimleptos/
 ├── src/nimleptos/
-│   ├── reactive/          # Signal, Effect, Memo, Batch
+│   ├── reactive/          # Signal, Effect, Memo, Batch (thread-safe)
 │   ├── dom/               # HtmlNode, element builders
-│   ├── macros/            # Compile-time HTML DSL
-│   ├── ssr/               # Server-side rendering
-│   ├── server/            # NimMax adapter
+│   ├── macros/            # Compile-time HTML DSL + component view
+│   ├── ssr/               # Server-side rendering + hydration state
+│   ├── server/            # NimMax adapter, app wrapper, JWT auth
 │   ├── routing/           # Route components, layouts
 │   ├── forms/             # Form handling, validation
-│   ├── realtime/          # WebSocket signals
-│   └── client/            # JS hydration
-├── tests/
+│   ├── realtime/          # WebSocket signals (thread-safe)
+│   └── client/            # JS hydration, reactive DOM, router, HTTP
+├── tests/                 # 40 tests across 5 suites
 ├── examples/
 ├── docs/
 └── nimleptos.nimble
@@ -311,6 +390,8 @@ nimleptos/
 | [Forms & Validation](docs/forms.md) | Form rendering, validators |
 | [Client Hydration](docs/client.md) | JS compilation, event binding |
 | [WebSocket Realtime](docs/realtime.md) | Server signals, live updates |
+| [JWT Authentication](docs/auth.md) | Bearer tokens, login/refresh, role-based access |
+| [Component System](docs/components.md) | View macros, slots, typed props |
 
 ## Testing
 
@@ -357,8 +438,10 @@ nimble wasm
 | Reactivity | Signals | Signals (same model) |
 | Rendering | Virtual DOM / SSR | HtmlNode tree / SSR |
 | Backend | Actix/Axum | NimMax |
+| Auth | External (axum-login, etc.) | Built-in JWT (HS256/RS256/ES256) |
+| Components | `view!` + `#[component]` | `view` macro + procs |
 | Compilation | WASM + Native | Native (server) + JS (client) + WASM (core) |
-| Macros | `view!` | `buildHtml`, `el()` DSL with reactive interpolation & events |
+| Macros | `view!` | `buildHtml`, `el()`, `view` with reactive interpolation & events |
 | Hydration | WASM-based | `nim js` + `data-nl-id` |
 
 ## License

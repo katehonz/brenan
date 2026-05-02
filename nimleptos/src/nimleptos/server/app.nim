@@ -2,9 +2,11 @@ import nimmax
 import ../dom/node
 import ../ssr/renderer
 import ../ssr/hydration
+import ../reactive/subscriber
 import ./adapter
 
 export adapter
+export subscriber
 
 type
   NimLeptosApp* = ref object
@@ -32,29 +34,34 @@ proc newNimLeptosApp*(
   if clientStyle.len > 0:
     result.ssrCtx.addStyle(clientStyle)
 
-proc get*(app: NimLeptosApp, path: string, handler: HandlerAsync,
-          middlewares: seq[HandlerAsync] = @[], name = "") =
-  app.nimmaxApp.get(path, handler, middlewares, name)
+proc wrapHandler(handler: HandlerAsync): HandlerAsync =
+  return proc(ctx: Context) {.async.} =
+    withReactiveContext:
+      await handler(ctx)
 
-proc post*(app: NimLeptosApp, path: string, handler: HandlerAsync,
-           middlewares: seq[HandlerAsync] = @[], name = "") =
-  app.nimmaxApp.post(path, handler, middlewares, name)
+template get*(app: NimLeptosApp, path: string, handler: HandlerAsync,
+              middlewares: seq[HandlerAsync] = @[], name = "") =
+  app.nimmaxApp.get(path, wrapHandler(handler), middlewares, name)
 
-proc put*(app: NimLeptosApp, path: string, handler: HandlerAsync,
-          middlewares: seq[HandlerAsync] = @[], name = "") =
-  app.nimmaxApp.put(path, handler, middlewares, name)
+template post*(app: NimLeptosApp, path: string, handler: HandlerAsync,
+               middlewares: seq[HandlerAsync] = @[], name = "") =
+  app.nimmaxApp.post(path, wrapHandler(handler), middlewares, name)
 
-proc delete*(app: NimLeptosApp, path: string, handler: HandlerAsync,
-             middlewares: seq[HandlerAsync] = @[], name = "") =
-  app.nimmaxApp.delete(path, handler, middlewares, name)
+template put*(app: NimLeptosApp, path: string, handler: HandlerAsync,
+              middlewares: seq[HandlerAsync] = @[], name = "") =
+  app.nimmaxApp.put(path, wrapHandler(handler), middlewares, name)
 
-proc patch*(app: NimLeptosApp, path: string, handler: HandlerAsync,
-            middlewares: seq[HandlerAsync] = @[], name = "") =
-  app.nimmaxApp.patch(path, handler, middlewares, name)
+template delete*(app: NimLeptosApp, path: string, handler: HandlerAsync,
+                 middlewares: seq[HandlerAsync] = @[], name = "") =
+  app.nimmaxApp.delete(path, wrapHandler(handler), middlewares, name)
 
-proc all*(app: NimLeptosApp, path: string, handler: HandlerAsync,
-          middlewares: seq[HandlerAsync] = @[], name = "") =
-  app.nimmaxApp.all(path, handler, middlewares, name)
+template patch*(app: NimLeptosApp, path: string, handler: HandlerAsync,
+                middlewares: seq[HandlerAsync] = @[], name = "") =
+  app.nimmaxApp.patch(path, wrapHandler(handler), middlewares, name)
+
+template all*(app: NimLeptosApp, path: string, handler: HandlerAsync,
+              middlewares: seq[HandlerAsync] = @[], name = "") =
+  app.nimmaxApp.all(path, wrapHandler(handler), middlewares, name)
 
 proc use*(app: NimLeptosApp, middlewares: varargs[HandlerAsync]) =
   app.nimmaxApp.use(middlewares)

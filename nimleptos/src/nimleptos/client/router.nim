@@ -1,6 +1,5 @@
 ## Hash-based client-side router for NimLeptos
 
-import std/strutils
 import ../reactive/signal
 export signal
 

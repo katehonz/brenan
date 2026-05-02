@@ -38,7 +38,7 @@ proc generateHydrationScript*(ctx: SSRContext): string =
     var id = parseInt(node.getAttribute('data-nl-id'));
     node.__nimleptos_id = id;
   });
-  window.__nimleptos = { nextId: info.nextId, nodes: nodes };
+  window.__nimleptos = { nextId: info.nextId, nodes: nodes, initialState: info.initialState || {} };
 })();
 """
   result &= "</script>"

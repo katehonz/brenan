@@ -8,6 +8,7 @@ when defined(js):
       nextId*: int
       nodeCount*: int
       hydrated: bool
+      initialState: JsonNode
 
     HydrationCallback* = proc(node: DomElement, nlId: string) {.closure.}
 
@@ -19,16 +20,17 @@ when defined(js):
   proc loadHydrationData*(): HydrationState =
     let dataEl = getElementById("__nimleptos_data__")
     if dataEl == nil:
-      return HydrationState(nextId: 0, nodeCount: 0, hydrated: false)
+      return HydrationState(nextId: 0, nodeCount: 0, hydrated: false, initialState: newJNull())
     try:
       let data = parseJson($dataEl.textContent)
       result = HydrationState(
         nextId: data{"nextId"}.getInt(0),
         nodeCount: 0,
-        hydrated: false
+        hydrated: false,
+        initialState: data{"initialState"}.getOrDefault(newJNull())
       )
     except:
-      result = HydrationState(nextId: 0, nodeCount: 0, hydrated: false)
+      result = HydrationState(nextId: 0, nodeCount: 0, hydrated: false, initialState: newJNull())
 
   proc hydrateNodes*(): seq[DomElement] =
     let nodes = querySelectorAll("[data-nl-id]")
@@ -60,17 +62,35 @@ when defined(js):
       discard hydrateApp()
     )
 
+  proc getInitialState*(): JsonNode =
+    let state = loadHydrationData()
+    return state.initialState
+
+  proc getInitialValue*(key: string, default: string = ""): string =
+    let state = loadHydrationData()
+    if state.initialState.kind == JObject:
+      return state.initialState{key}.getStr(default)
+    return default
+
 else:
+  import std/json
   type
     HydrationState* = ref object
       nextId*: int
       nodeCount*: int
       hydrated: bool
+      initialState: JsonNode
 
   proc hydrateApp*(): HydrationState =
-    HydrationState(nextId: 0, nodeCount: 0, hydrated: false)
+    HydrationState(nextId: 0, nodeCount: 0, hydrated: false, initialState: newJNull())
 
   proc initHydration*() =
     discard
+
+  proc getInitialState*(): JsonNode =
+    newJNull()
+
+  proc getInitialValue*(key: string, default: string = ""): string =
+    default
 
 

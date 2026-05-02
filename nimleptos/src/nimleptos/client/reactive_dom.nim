@@ -54,15 +54,25 @@ when defined(js):
       wrapper.style.setProperty("display", "contents")
       let thenEl = renderDomNode(node.thenBranch)
       let elseEl = renderDomNode(node.elseBranch)
-      wrapper.appendChild(thenEl)
-      wrapper.appendChild(elseEl)
+      var currentIsThen = node.condition()
+      if currentIsThen:
+        wrapper.appendChild(thenEl)
+      else:
+        wrapper.appendChild(elseEl)
       discard createEffect(proc() =
-        if node.condition():
-          thenEl.style.setProperty("display", "")
-          elseEl.style.setProperty("display", "none")
-        else:
-          thenEl.style.setProperty("display", "none")
-          elseEl.style.setProperty("display", "")
+        let cond = node.condition()
+        if cond != currentIsThen:
+          if cond:
+            if wrapper.firstChild != nil:
+              wrapper.replaceChild(thenEl, wrapper.firstChild)
+            else:
+              wrapper.appendChild(thenEl)
+          else:
+            if wrapper.firstChild != nil:
+              wrapper.replaceChild(elseEl, wrapper.firstChild)
+            else:
+              wrapper.appendChild(elseEl)
+          currentIsThen = cond
       )
       return wrapper
     result = createElement(node.tag)

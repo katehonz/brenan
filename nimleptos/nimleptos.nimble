@@ -1,5 +1,5 @@
 # Package
-version       = "0.1.0"
+version       = "0.2.0"
 author        = "NimLeptos Contributors"
 description   = "A full-stack reactive web framework for Nim inspired by Leptos"
 license       = "MIT"
@@ -8,6 +8,7 @@ srcDir        = "src"
 # Dependencies
 requires "nim >= 2.0.0"
 requires "nimmax >= 1.0.0"
+requires "jwt >= 2.1.0"
 
 import os
 

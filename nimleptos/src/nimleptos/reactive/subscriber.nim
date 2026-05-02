@@ -25,10 +25,13 @@ type
     pending: bool
     batchDepth: int
 
-var currentComputation: Computation = nil
-var globalScheduler = Scheduler(queue: @[], pending: false, batchDepth: 0)
+var currentComputation {.threadvar.}: Computation
+var globalScheduler {.threadvar.}: Scheduler
 
-proc getScheduler*(): Scheduler = globalScheduler
+proc getScheduler*(): Scheduler =
+  if globalScheduler == nil:
+    globalScheduler = Scheduler(queue: @[], pending: false, batchDepth: 0)
+  return globalScheduler
 
 proc getCurrentComputation*(): Computation = currentComputation
 
@@ -87,7 +90,7 @@ proc notify*(signal: SignalBase) =
     if sub.onNotify != nil:
       sub.onNotify()
     elif sub of Computation:
-      globalScheduler.schedule(Computation(sub))
+      getScheduler().schedule(Computation(sub))
 
 proc batch*(sched: Scheduler, fn: proc() {.closure.}) =
   inc sched.batchDepth
@@ -99,7 +102,7 @@ proc batch*(sched: Scheduler, fn: proc() {.closure.}) =
       flush(sched)
 
 proc batch*(fn: proc() {.closure.}) =
-  globalScheduler.batch(fn)
+  getScheduler().batch(fn)
 
 proc addDependency*(signal: SignalBase) =
   if currentComputation != nil:
@@ -108,3 +111,38 @@ proc addDependency*(signal: SignalBase) =
     signal.subscribe(currentComputation)
     if signal notin currentComputation.dependencies:
       currentComputation.dependencies.add(signal)
+
+type
+  ReactiveContext* = ref object
+    savedComputation: Computation
+    savedScheduler: Scheduler
+    ownedScheduler: Scheduler
+
+proc newReactiveContext*(): ReactiveContext =
+  let prevSched = getScheduler()
+  let freshSched = Scheduler(queue: @[], pending: false, batchDepth: 0)
+  globalScheduler = freshSched
+  ReactiveContext(
+    savedComputation: currentComputation,
+    savedScheduler: prevSched,
+    ownedScheduler: freshSched,
+  )
+
+proc release*(ctx: ReactiveContext) =
+  for comp in ctx.ownedScheduler.queue:
+    cleanup(comp)
+  currentComputation = ctx.savedComputation
+  globalScheduler = ctx.savedScheduler
+
+template withReactiveContext*(body: untyped) =
+  var nlReactiveCtx = newReactiveContext()
+  try:
+    body
+  finally:
+    release(nlReactiveCtx)
+
+proc resetThreadContext*() =
+  currentComputation = nil
+  for comp in getScheduler().queue:
+    cleanup(comp)
+  globalScheduler = Scheduler(queue: @[], pending: false, batchDepth: 0)

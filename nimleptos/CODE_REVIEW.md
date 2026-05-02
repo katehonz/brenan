@@ -1,8 +1,62 @@
 # NimLeptos — Code Review & Progress Log
 
 **Date**: 2026-05-02
-**Status**: Phase 1-12 Complete
+**Status**: Phase 1-13 Complete (Production Hardening + JWT Auth)
 **Tests**: All passing (40 tests across 5 test suites)
+**New files**: 2 (`view_macros.nim`, `auth.nim`)
+
+---
+
+## Phase 13 Session — Production Hardening for Accounting App
+
+### Thread Safety (Critical)
+- `subscriber.nim`: `currentComputation` and `globalScheduler` converted to `{.threadvar.}` — each thread gets its own reactive context, eliminating race conditions in multi-threaded async servers
+- `getScheduler()` provides lazy initialization for thread-local schedulers (needed because Nim doesn't allow explicit init of threadvar)
+- `ReactiveContext` type added with `newReactiveContext()` / `release()` for per-request isolation
+- `withReactiveContext` template wraps handler code in a fresh reactive context (clean dependency tracking per HTTP request)
+- `resetThreadContext()` for full cleanup
+- `app.nim`: all route handlers auto-wrapped via `wrapHandler()` → each request gets `withReactiveContext`
+- `ws_bridge.nim`: `globalRegistry` protected with `Lock` (thread-safe signal registry for WebSocket realtime)
+
+### Conditional Rendering (Fixed)
+- `reactive_dom.nim` line 52-65: replaced `display: none` toggling with proper DOM `replaceChild` swap
+- Previously: both branches always in DOM (hidden/shown via CSS) — wasted DOM nodes, screen reader leakage
+- Now: only the active branch is in the DOM; uses `replaceChild` for real add/remove
+
+### Component System (New)
+- New file: `src/nimleptos/macros/view_macros.nim`
+- `ComponentChildren` type and helpers: `slot()`, `noChildren()`, `renderSlot()`
+- `view` macro: ergonomic component invocation with children DSL
+  ```nim
+  view Card(title="Hello"):
+    el("p"): text("Card content")
+  # Expands to: Card(title="Hello", children=@[buildHtml: ...])
+  ```
+
+### SSR → Client Signal State Persistence (New)
+- `SSRContext.initialState` table for server-side state serialization
+- `addInitialState(key, value)` — server sets initial data during SSR render
+- `renderHydrationData()` serializes initialState as JSON in `__nimleptos_data__`
+- Client: `getInitialState()` and `getInitialValue(key, default)` to read back state after hydration
+- Hydration script passes `info.initialState` to `window.__nimleptos`
+
+### Authentication & Authorization (JWT — New)
+- New file: `src/nimleptos/server/auth.nim`
+- Powered by [jwt-nim-baraba](https://github.com/katehonz/jwt-nim-baraba) (HS256/RS256/ES256 via BearSSL)
+- `AuthUser` type with id, username, email, role, permissions
+- JWT token-based: `createAccessToken()`, `createRefreshToken()`, `verifyToken()`, `verifyRefreshToken()`
+- `jwtAuthMiddleware()` — Bearer token extraction + verification + context population
+- `setContextAuthUser()` / `extractAuthUser()` — user storage in NimMax context (JSON-based)
+- `isAuthenticated()`, `hasRole()`, `hasPermission()` — access checks
+- Middleware: `requireAuth()`, `requireRole()`, `requirePermission()`
+- Handlers: `loginHandler(checkCreds)` returns `{access_token, refresh_token, user}`, `refreshHandler()`
+- `setJwtConfig()` / `setJwtSecret()` — global configuration (secret, expiry, issuer)
+- `decodeToken()` — decode JWT payload without verification (debug)
+- `JwtConfig` is value-type (not ref) for gcsafe closure compatibility
+- Replaced SHA-1 session auth with Bearer-token JWT auth
+
+### Minor Fixes
+- `router.nim`: removed unused `strutils` import
 
 ---
 
@@ -84,31 +138,35 @@ Added 19 missing HTML element builders to `elements.nim`:
 
 ---
 
-## Current File Inventory (23 files)
+## Current File Inventory (25 files)
 
 ```
 src/nimleptos/
 ├── reactive/
-│   ├── subscriber.nim      # Signal[T], dependency tracking, scheduler, batch
+│   ├── subscriber.nim      # Signal[T], dependency tracking, scheduler, batch, ReactiveContext
 │   ├── signal.nim          # createSignal, Getter/Setter types
 │   └── effects.nim         # createEffect, createMemo (fixed memo.value sync)
 ├── dom/
 │   ├── node.nim            # HtmlNode type, renderToHtml, renderToHtmlRaw (fixed), escapeHtml
-│   └── elements.nim        # 35 element builders (19 new)
+│   └── elements.nim        # 47 element builders via templates
 ├── macros/
-│   └── html_macros.nim     # buildHtml, el, html macros (compile-time DSL)
+│   ├── html_macros.nim     # buildHtml, el, html macros (compile-time DSL)
+│   └── view_macros.nim     # view macro, ComponentChildren, slot/renderSlot helpers (NEW)
 ├── ssr/
-│   ├── renderer.nim        # SSRContext, renderFullPage, renderHead
-│   └── hydration.nim       # data-nl-id injection, hydration script
+│   ├── renderer.nim        # SSRContext (added initialState), renderFullPage, renderHead
+│   └── hydration.nim       # data-nl-id injection, hydration script (added initialState)
 ├── client/
 │   ├── dom_interop.nim     # DOM manipulation wrappers for JS backend
-│   ├── reactive_dom.nim    # Fine-grained reactive DOM binding
-│   ├── hydration_client.nim # Client-side hydration (improved with callbacks)
-│   └── event_handlers.nim  # Event binding system (fixed type compat)
+│   ├── reactive_dom.nim    # Fine-grained reactive DOM binding (fixed conditional render)
+│   ├── hydration_client.nim # Client-side hydration (added getInitialState/getInitialValue)
+│   ├── event_handlers.nim  # Event binding system (fixed type compat)
+│   ├── http_client.nim     # fetchGetJson/fetchPostJson wrappers
+│   └── router.nim          # Hash-based client router
 ├── server/
 │   ├── adapter.nim         # Bridge between NimLeptos HtmlNode and NimMax Context
-│   ├── app.nim             # NimLeptosApp wrapper around nimmax Application
-│   └── middleware.nim      # Functional middlewares (hydration, title, assets)
+│   ├── app.nim             # NimLeptosApp with per-request reactive context (wrapHandler)
+│   ├── middleware.nim      # Functional middlewares (hydration, title, assets)
+│   └── auth.nim            # JWT authentication (jwt-nim-baraba), middleware, token management (NEW)
 ├── routing/
 │   ├── route.nim           # Declarative route components with layouts
 │   └── layout.nim          # mainLayout, sidebarLayout, html5Layout (fixed)
@@ -116,7 +174,7 @@ src/nimleptos/
 │   ├── form.nim            # FormDef, FormField (fixed textarea/select/checkbox)
 │   └── validation.nim      # Validators wrapping nimmax/validater
 └── realtime/
-    ├── ws_bridge.nim       # ServerSignal[T] (fixed type hierarchy + broadcast)
+    ├── ws_bridge.nim       # ServerSignal[T] (fixed type hierarchy + broadcast + lock)
     └── ws_handler.nim      # WebSocket signal routes (fixed update endpoint)
 ```
 
@@ -148,28 +206,22 @@ src/nimleptos/
 
 ## Known Limitations & Next Steps
 
+### Resolved (Phase 13)
+1. ~~**Thread safety**~~ → ✅ FIXED. `threadvar` + per-request `withReactiveContext` + `Lock` on signal registry.
+2. ~~**`renderDomNode` conditional nodes use display toggling**~~ → ✅ FIXED. Uses `replaceChild` for real DOM add/remove.
+3. ~~**No component composition in macros**~~ → ✅ FIXED. `view` macro with children support.
+4. ~~**Server-side signal state persistence**~~ → ✅ FIXED. `addInitialState` / `getInitialValue` SSR handoff.
+
 ### Current Limitations
-
-1. ~~**No reactive interpolation in `buildHtml` macro**~~ → ✅ FIXED in Phase 12. Non-literal expressions in DSL body now automatically produce reactive text nodes on JS target.
-
-2. **`renderDomNode` conditional nodes use display toggling**: Both branches are always in the DOM (hidden via `display: none`). This wastes DOM nodes and could cause issues with event handlers on hidden elements.
-
-3. ~~**Event handlers in macros not yet supported**~~ → ✅ FIXED in Phase 12. `onClick`, `onInput`, etc. are detected by DSL macros and generate `addDomEvent` calls for CSR.
-
-4. **No component composition in macros**: The `view` macro exists but is basic. It generates `proc(name: RootObj): HtmlNode` which is not ergonomic for real use.
-
-5. **Thread safety**: Global mutable state in `subscriber.nim` (`currentComputation`, `globalScheduler`) is not thread-safe. Fine for single-threaded JS but problematic for multi-threaded native servers.
+1. **Thread safety in shared global state**: `subscriber.nim` globals are now per-thread, but there's still `globalRegistry` in `ws_bridge.nim` protected by a lock. Heavy WebSocket usage may contend on this lock.
+2. **Password hashing**: Auth uses JWT (stateless) — actual password hashing is delegated to the user's `CredentialChecker` callback. For production accounting, use bcrypt/argon2 in the checker.
+3. **`renderDomNode` conditional swap recreates nodes on each toggle**: Both branches exist in memory; `replaceChild` re-attaches them. Reactive bindings on children persist correctly.
+4. **No component lifecycle hooks**: No `onMount` / `onDestroy` / `onUpdate` — Leptos-style lifecycle not yet implemented.
+5. **CSR examples not tested automatically**: Client-side rendering tests require a browser; only native/server tests are automated.
 
 ### Recommended Next Steps
-
-1. **Component macro with props**: Rewrite `view` macro to accept typed props (like `proc(props: MyProps): HtmlNode`) instead of `RootObj`.
-
-2. **Reactive macro interpolation**: Enhance `buildHtml` to detect signal getters (`count()`, `name()`) inside `text()` and automatically wrap them in `reactiveTextNode` calls when compiling for JS.
-
-3. **Event binding in DSL**: Add `onClick`, `onInput`, etc. as special attributes in `el` macro that generate `addEventListener` calls.
-
-4. **CSS-in-Nim / scoped styles**: Add a `style` macro or template that generates scoped CSS for components.
-
-5. **Server-side signal state persistence**: Add ability to serialize/deserialize `ServerSignal` values for SSR → client hydration handoff.
-
-6. **Dev server / HMR**: Add a `nimble dev` task that watches `.nim` files and recompiles both server and client automatically.
+1. **Replace SHA-1 with bcrypt**: Add `bcrypt` nimble dependency for proper password hashing.
+2. **CSR client test harness**: Add Playwright/Puppeteer-based tests for client-side examples.
+3. **Component lifecycle**: `onMount`, `onDestroy`, `onUpdate` hooks for resource management.
+4. **CSV/PDF export middleware**: Essential for accounting apps — report generation.
+5. **Database integration**: Add SQLite/PostgreSQL session store + ORM helpers.

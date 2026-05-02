@@ -3,6 +3,7 @@ import nimleptos/reactive/effects
 import nimleptos/dom/node
 import nimleptos/dom/elements
 import nimleptos/macros/html_macros
+import nimleptos/macros/view_macros
 import nimleptos/ssr/renderer
 import nimleptos/ssr/hydration
 import nimleptos/client/reactive_dom
@@ -14,6 +15,7 @@ import nimleptos/client/event_handlers
 import nimleptos/server/adapter
 import nimleptos/server/app
 import nimleptos/server/middleware
+import nimleptos/server/auth
 import nimleptos/routing/route
 import nimleptos/routing/layout
 import nimleptos/forms/form
@@ -24,6 +26,7 @@ export effects
 export node
 export elements
 export html_macros
+export view_macros
 export renderer
 export hydration
 export reactive_dom
@@ -35,6 +38,7 @@ export event_handlers
 export adapter
 export app
 export middleware
+export auth
 export route
 export layout
 export form
