@@ -1,4 +1,5 @@
 import nimmax
+import std/json
 
 proc hydrationMiddleware*(): HandlerAsync =
   result = proc(ctx: Context): Future[void] {.async, gcsafe.} =

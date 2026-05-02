@@ -17,6 +17,7 @@ task test, "Run all tests":
   exec "nim c -r --threads:on -p:src tests/macros_test.nim"
   exec "nim c -r --threads:on -p:src tests/ssr_test.nim"
   exec "nim c -r --threads:on -p:src tests/server_test.nim"
+  exec "nim c -r --threads:on -p:src tests/all_test.nim"
 
 task example, "Run counter example":
   exec "nim c -r --threads:on -p:src examples/counter/main.nim"

@@ -1,9 +1,40 @@
 # NimLeptos — Code Review & Progress Log
 
 **Date**: 2026-05-02
-**Status**: Phase 1-13 Complete (Production Hardening + JWT Auth)
-**Tests**: All passing (40 tests across 5 test suites)
-**New files**: 2 (`view_macros.nim`, `auth.nim`)
+**Status**: Phase 1-14 Complete (Universal Frontend Fixes + Backend Recommendations)
+**Tests**: All passing (40 tests across 5 test suites + all_test)
+**New files**: 1 (`NIMMAX_BACKEND_RECOMMENDATIONS.md` in repo root)
+
+---
+
+## Phase 14 Session — Universal Bug Fixes & API Hardening
+
+### SSRContext Race Condition (Critical)
+- `app.nim`: `render(ctx, node, app, title)` now creates a **fresh `SSRContext` per HTTP request** instead of reusing `app.ssrCtx`
+- Previously: shared `SSRContext` across all requests caused race conditions in multi-threaded servers (`nextId` unbounded growth, mixed `initialState`)
+- Now: each request gets isolated hydration IDs and clean state
+
+### NimLeptosApp Route Overloads (Critical)
+- `route.nim`: added `route`, `routePost`, `routeGroup` overloads for `NimLeptosApp` (in addition to existing `Application` overloads)
+- `NimLeptosApp` route handlers are auto-wrapped with `wrapHandler` → `withReactiveContext` → thread-safe per request
+- `Application` (raw nimmax) overloads preserved for backward compatibility and testing
+- `wrapHandler` exported (`*`) from `app.nim` so `route.nim` can use it
+
+### Middleware Connected to Render Pipeline (Medium)
+- `app.nim` `render` now reads `__title__`, `__client_script__`, `__client_style__` from NimMax context (set by `titleMiddleware`, `clientAssetsMiddleware`)
+- Middleware is no longer "dead code" — values actually flow into the rendered page
+
+### JSON Body Auth Support (Medium)
+- `auth.nim`: `loginHandler` and `refreshHandler` now accept **JSON request bodies** in addition to form POST params
+- Checks `Content-Type: application/json` before parsing; falls back to form params
+- Enables API-first frontends (SPA / mobile) to use the built-in JWT handlers
+
+### Missing Import Fix (Medium)
+- `client/router.nim`: added `import std/strutils` — was missing despite using `startsWith`
+- This would break `nim js` compilation of any app using the hash router
+
+### Test Suite Completeness (Minor)
+- `nimleptos.nimble`: added `tests/all_test.nim` to the `test` task
 
 ---
 

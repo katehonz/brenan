@@ -1,16 +1,16 @@
 # Compiled binaries
-nimleptos/tests/signal_test
-nimleptos/tests/macros_test
-nimleptos/tests/ssr_test
-nimleptos/tests/all_test
-nimleptos/tests/server_test
-nimleptos/examples/counter/main
-nimleptos/examples/counter_client.js
-nimleptos/examples/timer_client.js
-nimleptos/examples/hybrid_client.js
-nimleptos/examples/conditional_client.js
-nimleptos/examples/server_app
-nimleptos/examples/server_app.exe
+tests/signal_test
+tests/macros_test
+tests/ssr_test
+tests/all_test
+tests/server_test
+examples/counter/main
+examples/counter_client.js
+examples/timer_client.js
+examples/hybrid_client.js
+examples/conditional_client.js
+examples/server_app
+examples/server_app.exe
 
 # Build artifacts
 nimcache/
@@ -29,5 +29,21 @@ nimblecache/
 # WASM build artifacts
 examples/wasm_reactive.js
 examples/wasm_reactive.wasm
+examples/wasm_reactive
 examples/todo_app
+examples/blog/backend
 tests/*_test
+
+# Build artifacts in src/ (binaries without extension)
+src/nimleptos/client/router
+src/nimleptos/client/dom_interop.js
+src/nimleptos/client/http_client.js
+src/nimleptos/forms/form
+src/nimleptos/macros/html_macros
+src/nimleptos/macros/html_macros.js
+src/nimleptos/macros/view_macros.js
+src/nimleptos/reactive/subscriber
+src/nimleptos/routing/route
+src/nimleptos/server/adapter
+src/nimleptos/server/app
+src/nimleptos/server/auth

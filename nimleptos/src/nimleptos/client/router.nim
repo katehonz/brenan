@@ -5,6 +5,7 @@ export signal
 
 when defined(js):
   import std/dom
+  import std/strutils
 
   let (currentHashRoute, setCurrentHashRoute) = createSignal("/")
 

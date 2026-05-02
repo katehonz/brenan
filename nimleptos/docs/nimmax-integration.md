@@ -58,7 +58,8 @@ api.post("/users", createUser)
 
 | Proc | Description |
 |------|-------------|
-| `ctx.render(node, app, title)` | Full page with hydration markers |
+| `ctx.render(node, app, title)` | Full page with hydration markers. Creates a **fresh SSRContext per request** (thread-safe). Reads `__title__`, `__client_script__`, `__client_style__` from context. |
+| `ctx.render(node, title)` | Full page via low-level adapter (also thread-safe, but ignores middleware context values). |
 | `ctx.renderFragment(node)` | Raw HTML, no wrapper |
 | `ctx.json(data)` | JSON response |
 | `ctx.html(str)` | Raw HTML string |
@@ -69,17 +70,9 @@ api.post("/users", createUser)
 
 NimLeptos provides functional middleware that integrates with the SSR pipeline:
 
-### hydrationMiddleware
-
-Sets `__hydration_enabled__` context flag for downstream handlers:
-
-```nim
-app.use(hydrationMiddleware())
-```
-
 ### titleMiddleware
 
-Sets a default page title that can be overridden per-route:
+Sets a default page title via context. `render(ctx, node, app)` reads this value:
 
 ```nim
 app.use(titleMiddleware("My App"))
@@ -87,10 +80,18 @@ app.use(titleMiddleware("My App"))
 
 ### clientAssetsMiddleware
 
-Registers client-side scripts and styles:
+Injects client-side scripts and styles into the rendered page via context:
 
 ```nim
 app.use(clientAssetsMiddleware(script = "/app.js", style = "/app.css"))
+```
+
+### hydrationMiddleware
+
+Sets `__hydration_enabled__` context flag (available for custom handlers to check):
+
+```nim
+app.use(hydrationMiddleware())
 ```
 
 ### NimMax Middleware

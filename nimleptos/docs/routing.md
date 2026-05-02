@@ -16,6 +16,20 @@ proc homePage(ctx: Context): Future[HtmlNode] {.gcsafe.} =
 app.route("/home", homePage)
 ```
 
+### NimLeptosApp vs Application
+
+Route components work on both `NimLeptosApp` and raw `Application`:
+
+```nim
+# NimLeptosApp — handlers are wrapped with per-request reactive context (recommended)
+let app = newNimLeptosApp(title = "My App")
+app.route("/home", homePage)
+
+# Raw NimMax Application — no reactive context wrapping (for tests / low-level use)
+let rawApp = newApp()
+rawApp.route("/home", homePage)
+```
+
 ### With Layout
 
 ```nim

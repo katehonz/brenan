@@ -186,13 +186,28 @@ proc requirePermission*(perm: string, redirectPath: string = "/login"): HandlerA
       return
     await switch(ctx)
 
+proc getLoginCredentials(ctx: Context): (string, string) =
+  var username = ctx.request.postParams.getOrDefault("username", "")
+  var password = ctx.request.postParams.getOrDefault("password", "")
+  if username.len == 0 and password.len == 0:
+    let ct = ctx.request.headers.table.getOrDefault("Content-Type", @[""])
+    if ct.len > 0 and ct[0].toLowerAscii.contains("application/json"):
+      try:
+        let body = parseJson(ctx.request.body)
+        if body.hasKey("username"):
+          username = body["username"].getStr("")
+        if body.hasKey("password"):
+          password = body["password"].getStr("")
+      except:
+        discard
+  result = (username, password)
+
 proc loginHandler*(checkCreds: CredentialChecker, secret: string = defaultJwtConfig.secret): HandlerAsync =
   let s = secret
   let accessExp = defaultJwtConfig.accessExpiry
   let refreshExp = defaultJwtConfig.refreshExpiry
   result = proc(ctx: Context): Future[void] {.async, gcsafe.} =
-    let username = ctx.request.postParams.getOrDefault("username", "")
-    let password = ctx.request.postParams.getOrDefault("password", "")
+    let (username, password) = getLoginCredentials(ctx)
     if username.len == 0 or password.len == 0:
       ctx.json(%*{"error": "username and password required"}, Http400)
       return
@@ -210,11 +225,23 @@ proc loginHandler*(checkCreds: CredentialChecker, secret: string = defaultJwtCon
       "user": {"id": user.id, "username": user.username, "role": user.role},
     }, Http200)
 
+proc getRefreshToken(ctx: Context): string =
+  result = ctx.request.postParams.getOrDefault("refresh_token", "")
+  if result.len == 0:
+    let ct = ctx.request.headers.table.getOrDefault("Content-Type", @[""])
+    if ct.len > 0 and ct[0].toLowerAscii.contains("application/json"):
+      try:
+        let body = parseJson(ctx.request.body)
+        if body.hasKey("refresh_token"):
+          result = body["refresh_token"].getStr("")
+      except:
+        discard
+
 proc refreshHandler*(secret: string = defaultJwtConfig.secret): HandlerAsync =
   let s = secret
   let accessExp = defaultJwtConfig.accessExpiry
   result = proc(ctx: Context): Future[void] {.async, gcsafe.} =
-    let refreshTokenStr = ctx.request.postParams.getOrDefault("refresh_token", "")
+    let refreshTokenStr = getRefreshToken(ctx)
     if refreshTokenStr.len == 0:
       ctx.json(%*{"error": "refresh_token required"}, Http400)
       return
