@@ -136,15 +136,50 @@
 ## минимален wasm модул и го тества в Node.js чрез Emscripten runtime.
 
 
+# BUG #6 (P0): Emscripten — NimMain не се извиква без _main export
+# =================================================================
+
+## Открит по време на NimLeptos интеграция (2026-05-03)
+##
+## Проблем: Когато `_main` НЕ Е в `-sEXPORTED_FUNCTIONS`, Emscripten
+## не извиква `main()` → `NimMain()` не се изпълнява → модулната
+## инициализация (createSignal, createEffect) не работи.
+##
+## Симптом: Всички export-нати функции дават "null function or function
+## signature mismatch" защото сигнал closures-ите не са инициализирани.
+##
+## Fix: Винаги включвай `_main` в EXPORTED_FUNCTIONS:
+##   -sEXPORTED_FUNCTIONS=['_main','_increment','_getCount']
+##
+## Без _main модулът се инициализира но без NimMain → сигналите са
+## в невалидно състояние → function table indices сочат към null.
+
+
+# BUG #7 (P1): Nim — createMemo closure не работи в wasm32 с ARC/ORC
+# ==================================================================
+
+## createMemo използва `var cachedValue` capture в closure → в wasm32
+## това води до "null function or function signature mismatch".
+##
+## createSignal работи (capture-ва `let sig` — референция към ref object).
+## createMemo не работи (capture-ва `var cachedValue` — mutable stack var).
+##
+## Workaround: Ползвай `var` + `createEffect` вместо `createMemo`:
+##   var doubled: int
+##   discard createEffect(proc() = doubled = count() * 2)
+
+
 # Резюме за приоритети
 # ====================
 #
 # P0 (блокира Emscripten интеграцията):
 #   Bug #1: __nbg_describe undeclared → emit extern declaration
 #   Bug #2: web_sys emit blocks са JS, не C → добави EM_ASM клон
+#   Bug #6: _main трябва да е в EXPORTED_FUNCTIONS за NimMain init
 #
 # P1 (важно за production):
 #   Bug #3: =destroy hook member access
+#   Bug #7: createMemo closure не работи в wasm32
 #
 # P2 (подобрения):
 #   Bug #4: web_sys_generated не е re-export-нат
