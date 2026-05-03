@@ -169,18 +169,48 @@
 ##   discard createEffect(proc() = doubled = count() * 2)
 
 
+# BUG #8 (P0): web_sys.nim — 160 emit блока със счупен синтаксис след EM_ASM fix
+# =================================================================================
+
+## Commit: 2342914 fix: Emscripten compatibility bugs #1-4
+##
+## Брой засегнати реда: 160 (в web_sys.nim)
+##
+## Проблем: EM_ASM конвертирането е поставило запетая и Nim променлива
+## ИЗВЪН кавичките на emit стринга + trailing dot:
+##
+##   {.emit: "`idx` = EM_ASM_INT({ return addHeapObject(heap[$0].body); });", `docIdx`.}
+##                                                                         ^^     ^
+##                                                                   запетая извън   dot
+##                                                                   стринга          грешен
+##
+## Трябва да бъде (всичко в един стринг):
+##
+##   {.emit: "`idx` = EM_ASM_INT({ return addHeapObject(heap[$0].body); }, `docIdx`);".}
+##
+## Първите 2 блока с mulitple параметри СА правилни (ред 56, 70, 84):
+##   {.emit: "`idx` = EM_ASM_INT({...}, `docIdx`, `idPtr`);".}  ✅
+##
+## Но всички останали 160 блока с 1 параметър са счупени:
+##   {.emit: "`idx` = EM_ASM_INT({...});", `docIdx`.}  ❌
+##
+## Fix: Премести затварящата кавичка СЛЕД всички аргументи, махни точката.
+##   sed 's/`);", `\\([^`]*\\)`\\.}/`, `\\1`);"/g' → ръчен fix е по-сигурен
+
+
 # Резюме за приоритети
 # ====================
 #
 # P0 (блокира Emscripten интеграцията):
-#   Bug #1: __nbg_describe undeclared → emit extern declaration
-#   Bug #2: web_sys emit blocks са JS, не C → добави EM_ASM клон
+#   Bug #1: __nbg_describe undeclared → remove nodecl ✅ FIXED (commit 2342914)
+#   Bug #2: web_sys emit blocks са JS, не C → добави EM_ASM клон ✅ PARTIALLY
 #   Bug #6: _main трябва да е в EXPORTED_FUNCTIONS за NimMain init
+#   Bug #8: 160 emit блока със счупен синтаксис (запетая+dot извън стринга)
 #
 # P1 (важно за production):
-#   Bug #3: =destroy hook member access
+#   Bug #3: =destroy hook member access ✅ FIXED (commit 2342914)
 #   Bug #7: createMemo closure не работи в wasm32
 #
 # P2 (подобрения):
-#   Bug #4: web_sys_generated не е re-export-нат
+#   Bug #4: web_sys_generated не е re-export-нат ✅ FIXED (commit 2342914)
 #   Bug #5: липсват Emscripten e2e тестове
