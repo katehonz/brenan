@@ -55,3 +55,11 @@ src/nimleptos/server/app
 src/nimleptos/server/auth
 src/nimleptos/wasm/*.js
 src/nimleptos/wasm/*.wasm
+
+# Additional build artifacts
+src/nimleptos.out
+src/nimleptos/client/reactive_dom.js
+src/nimleptos/wasm/dom_bridge
+src/nimleptos/wasm/reactive_wasm
+src/nimleptos/wasm/render
+tests/*_test.js

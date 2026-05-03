@@ -27,7 +27,7 @@ when defined(js):
         nextId: data{"nextId"}.getInt(0),
         nodeCount: 0,
         hydrated: false,
-        initialState: data{"initialState"}.getOrDefault(newJNull())
+        initialState: (if data.hasKey("initialState"): data["initialState"] else: newJNull())
       )
     except:
       result = HydrationState(nextId: 0, nodeCount: 0, hydrated: false, initialState: newJNull())

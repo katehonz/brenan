@@ -9,6 +9,7 @@ srcDir        = "src"
 requires "nim >= 2.0.0"
 requires "nimmax >= 1.0.0"
 requires "jwt >= 2.1.0"
+requires "nimbling >= 0.1.0"
 
 import os
 
@@ -17,6 +18,7 @@ task test, "Run all tests":
   exec "nim c -r --threads:on -p:src tests/macros_test.nim"
   exec "nim c -r --threads:on -p:src tests/ssr_test.nim"
   exec "nim c -r --threads:on -p:src tests/server_test.nim"
+  exec "nim c -r --threads:on -p:src tests/reactive_ext_test.nim"
   exec "nim c -r --threads:on -p:src tests/all_test.nim"
 
 task example, "Run counter example":
@@ -90,26 +92,20 @@ task wasmCounter, "Compile full WASM counter (signals + EM_ASM DOM updates + HTM
   echo ""
   echo "Build complete. Open examples/wasm_counter/index.html in a browser."
 
-task wasmApp, "Compile WASM app with reactive effects + DOM updates":
-  var emcc = findExe("emcc")
-  if emcc == "":
-    let emsdk = getEnv("EMSDK")
-    if emsdk != "":
-      emcc = emsdk / "upstream" / "emscripten" / "emcc"
-    else:
-      let home = getEnv("HOME")
-      let candidate = home / "emsdk" / "upstream" / "emscripten" / "emcc"
-      if fileExists(candidate):
-        emcc = candidate
-      else:
-        echo "Error: emcc not found. Install Emscripten (https://emscripten.org) and ensure it's in your PATH, set EMSDK env var, or install to ~/emsdk."
-        quit(1)
-  exec "nim c --cpu:wasm32 --mm:arc --threads:on -p:src " &
-    "--cc:clang --clang.exe:" & emcc & " --clang.linkerexe:" & emcc & " " &
-    "--passC:\"-sWASM=1\" " &
-    "--passL:\"-sWASM=1 -sMODULARIZE=1 -sEXPORT_NAME='NimLeptosWasm' " &
-    "-sEXPORTED_FUNCTIONS=['_main','_increment','_decrement','_getCount','_render'] " &
-    "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']\" " &
-    "-o:examples/wasm_counter/wasm_app.js examples/wasm_counter/wasm_app.nim"
+task nimblingReactive, "Compile reactive core example for nimbling WASM":
+  echo "Building nimbling reactive counter..."
+  exec "nim c --cc:clang --cpu:wasm32 --os:standalone --mm:orc -d:wasm32 " &
+    "-p:src --compileOnly --nimcache:examples/nimbling_reactive/nimcache " &
+    "examples/nimbling_reactive/counter.nim"
   echo ""
-  echo "Build complete. Open examples/wasm_counter/index_app.html in a browser."
+  echo "C files generated in examples/nimbling_reactive/nimcache"
+  echo ""
+  echo "Next steps:"
+  echo "  1. Link to WASM (requires WASI SDK or Zig):"
+  echo "     zig cc -target wasm32-wasi-musl -nostdlib -Wl,--no-entry -Wl,--export-all"
+  echo "       -I/usr/local/lib/nim/lib -o counter.wasm nimcache/*.c"
+  echo ""
+  echo "  2. Post-process with nimbling CLI:"
+  echo "     nimbling counter.wasm --out-dir pkg/ --target bundler"
+  echo ""
+  echo "  3. Open examples/nimbling_reactive/index.html in a browser"

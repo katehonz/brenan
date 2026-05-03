@@ -22,6 +22,9 @@ A full-stack reactive web framework for Nim, inspired by [Leptos](https://leptos
 - **JWT Authentication** — HMAC/RSA/ECDSA signing via BearSSL, Bearer token middleware, refresh tokens, role-based access
 - **Component System** — `view` macro with typed props, children/slots, `ComponentChildren`
 - **SSR State Handoff** — Server initializes client state via `addInitialState` → `getInitialValue`
+- **Context** — Dependency injection for reactive components (key/value provider/consumer)
+- **Store** — Global reactive state container with selectors and slices
+- **Resource** — Async reactive primitive with loading/error/value states and auto-refetch
 
 ## Quick Start
 
@@ -62,6 +65,39 @@ main()
 nim c -r --threads:on -p:src myapp.nim
 # Server starts on http://0.0.0.0:8080
 ```
+
+## Multi-Target Compilation
+
+NimLeptos reactive core compiles to three targets:
+
+| Target | Command | Use Case |
+|--------|---------|----------|
+| **Native** | `nim c --threads:on -p:src` | Server-side rendering, full-stack |
+| **JavaScript** | `nim js -p:src` | Client-side rendering in the browser |
+| **WASM** | `nim c --cpu:wasm32 --mm:arc ...` | High-performance reactive core in the browser |
+
+### Native (default)
+```bash
+nim c -r --threads:on -p:src app.nim
+```
+
+### JavaScript (nim js)
+```bash
+nim js -p:src -o:app.js app.nim
+# Reactive signals, effects, and DOM updates work in the browser
+```
+
+### WebAssembly (WASM)
+
+**With Nimbling** (recommended):
+```bash
+nimble nimbling_reactive
+# Follow the printed instructions to link with Zig/WASI and post-process
+```
+
+The reactive core (`signal`, `effects`, `context`, `store`, `resource`) is fully portable across all three targets. Platform-specific DOM bindings are provided by:
+- `client/reactive_dom.nim` — for `nim js`
+- `wasm/reactive_wasm.nim` — WASM stub (DOM is handled by JS glue when using Nimbling)
 
 ## Reactivity
 
@@ -203,54 +239,54 @@ app.post("/register", proc(ctx: Context) {.async.} =
 )
 ```
 
-## WebAssembly (WASM)
+## WebAssembly (WASM) — Nimbling Edition
 
-Compile the reactive core to WebAssembly for high-performance signal computation in the browser, controlled from JavaScript:
+Compile the reactive core to WebAssembly for high-performance signal computation in the browser, controlled from JavaScript via [Nimbling](https://github.com/katehonz/nimbling):
 
 ```nim
-# examples/wasm_reactive.nim
+# examples/nimbling_reactive/counter.nim
+import nimbling
 import nimleptos/reactive/signal
 import nimleptos/reactive/effects
 
 let (count, setCount) = createSignal(0)
 let (doubled, _) = createMemo(proc(): int = count() * 2)
 
-{.push exportc.}
-proc increment() = setCount(count() + 1)
-proc decrement() = setCount(count() - 1)
-proc getCount(): int = count()
-proc getDoubled(): int = doubled()
-{.pop.}
+proc increment() {.wasmBindgen.} = setCount(count() + 1)
+proc decrement() {.wasmBindgen.} = setCount(count() - 1)
+proc getCount(): int32 {.wasmBindgen.} = count().int32
+proc getDoubled(): int32 {.wasmBindgen.} = doubled().int32
+
+wasmBindgenFinalize()
 ```
 
-Build with Emscripten:
+Build with Nimbling:
 
 ```bash
-# Ensure emcc is in PATH (source ~/emsdk/emsdk_env.sh)
-nimble wasm
+nimble nimbling_reactive
+# Then link with Zig/WASI and post-process with nimbling CLI
 ```
 
 Use from JavaScript:
 
 ```javascript
-import initWasm from './wasm_reactive.js';
-const module = await initWasm();
-module._main();  // Initialize Nim globals
+import initWasm from './pkg/counter.js';
+const wasm = await initWasm();
 
-module._increment();
-console.log(module._getCount());      // 1
-console.log(module._getDoubled());    // 2
+wasm.increment();
+console.log(wasm.getCount());      // 1
+console.log(wasm.getDoubled());    // 2
 ```
 
-Open `examples/wasm_reactive.html` in a browser to see the interactive demo.
+Open `examples/nimbling_reactive/index.html` in a browser to see the interactive demo.
 
 ### WASM Architecture
 
 | Layer | Technology | Role |
 |-------|-----------|------|
-| Reactive Core | Nim → WASM (Emscripten) | Signals, effects, memos |
-| JS Bridge | Emscripten `EXPORTED_FUNCTIONS` | Call Nim procs from JS |
-| DOM | Plain JS / `std/dom` | Render and event handling |
+| Reactive Core | Nim → WASM (nimbling) | Signals, effects, memos |
+| JS Bridge | Nimbling `wasmBindgen` | Type-safe JS ↔ Wasm interop |
+| DOM | Plain JS | Render and event handling |
 
 > **Note:** Avoid `echo` inside `createEffect` when compiling to WASM — it can block stdout and cause deadlock in the Emscripten runtime. Use JS-side logging instead.
 
@@ -358,6 +394,68 @@ import nimleptos/client/hydration_client
 let invoices = getInitialValue("invoices", "[]")
 let role = getInitialValue("userRole", "viewer")
 
+## Context — Dependency Injection
+
+```nim
+import nimleptos/reactive/context
+
+type UserCtx = ref object of ContextValue
+  name: string
+
+provideContext("user", UserCtx(name: "Alice"))
+let user = useContextAs[UserCtx]("user")
+echo user.name  # "Alice"
+```
+
+## Store — Global Reactive State
+
+```nim
+import nimleptos/reactive/store
+
+type AppState = object
+  count: int
+  theme: string
+
+let store = createStore(AppState(count: 0, theme: "dark"))
+store.update(proc(s: AppState): AppState =
+  result = s
+  result.count += 1
+)
+
+# Derived selector (memoized, only recalculates when slice changes)
+let count = store.select(proc(s: AppState): int = s.count)
+echo count()  # 1
+
+# Reactive slice with getter/setter
+let countSlice = createSlice(store,
+  proc(s: AppState): int = s.count,
+  proc(s: AppState, v: int): AppState =
+    result = s; result.count = v)
+countSlice.set(42)
+```
+
+## Resource — Async Reactive Data
+
+```nim
+import nimleptos/reactive/resource
+
+# Standalone resource
+let data = createResource(proc(): string =
+  "Fetched data"
+)
+echo data.value()     # "Fetched data"
+echo data.loading()   # false
+echo data.state()     # rsReady
+
+# Source-driven resource (auto-refetch on signal change)
+let (userId, setUserId) = createSignal(1)
+let user = createResource(userId, proc(id: int): string =
+  "User " & $id
+)
+echo user.value()     # "User 1"
+setUserId(2)          # automatically refetches → "User 2"
+```
+
 ## Project Structure
 
 ```
@@ -426,8 +524,8 @@ nimble blog
 # Full-stack Todo App (SSR + forms + validation)
 nimble todo
 
-# Reactive core to WASM (requires Emscripten)
-nimble wasm
+# Reactive core to WASM (requires Nimbling + Zig/WASI)
+nimble nimbling_reactive
 ```
 
 ## Comparison with Leptos (Rust)
@@ -440,6 +538,9 @@ nimble wasm
 | Backend | Actix/Axum | NimMax |
 | Auth | External (axum-login, etc.) | Built-in JWT (HS256/RS256/ES256) |
 | Components | `view!` + `#[component]` | `view` macro + procs |
+| Context | `use_context` / `provide_context` | `useContext` / `provideContext` |
+| Store | `Store` | `Store[T]` with selectors & slices |
+| Resource | `Resource` | `Resource[T]` with auto-refetch |
 | Compilation | WASM + Native | Native (server) + JS (client) + WASM (core) |
 | Macros | `view!` | `buildHtml`, `el()`, `view` with reactive interpolation & events |
 | Hydration | WASM-based | `nim js` + `data-nl-id` |

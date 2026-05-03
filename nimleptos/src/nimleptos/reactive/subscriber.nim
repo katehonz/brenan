@@ -25,8 +25,14 @@ type
     pending: bool
     batchDepth: int
 
-var currentComputation {.threadvar.}: Computation
-var globalScheduler {.threadvar.}: Scheduler
+when defined(js) or defined(wasm32):
+  ## JS and WASM (without pthreads) use plain globals.
+  ## Native backend uses thread-local for thread safety.
+  var currentComputation: Computation
+  var globalScheduler: Scheduler
+else:
+  var currentComputation {.threadvar.}: Computation
+  var globalScheduler {.threadvar.}: Scheduler
 
 proc getScheduler*(): Scheduler =
   if globalScheduler == nil:
@@ -103,6 +109,11 @@ proc batch*(sched: Scheduler, fn: proc() {.closure.}) =
 
 proc batch*(fn: proc() {.closure.}) =
   getScheduler().batch(fn)
+
+proc newSignal*[T](initial: T): Signal[T] =
+  ## Creates a new Signal with the given initial value.
+  result = Signal[T](value: initial)
+  result.subscribers = newSeq[Subscriber]()
 
 proc addDependency*(signal: SignalBase) =
   if currentComputation != nil:

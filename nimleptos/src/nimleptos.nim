@@ -1,5 +1,8 @@
 import nimleptos/reactive/signal
 import nimleptos/reactive/effects
+import nimleptos/reactive/context
+import nimleptos/reactive/store
+import nimleptos/reactive/resource
 import nimleptos/dom/node
 import nimleptos/dom/elements
 import nimleptos/macros/html_macros
@@ -21,9 +24,13 @@ import nimleptos/routing/layout
 import nimleptos/forms/form
 import nimleptos/forms/validation
 import nimleptos/wasm/dom_bridge
+import nimleptos/wasm/reactive_wasm
 
 export signal
 export effects
+export context
+export store
+export resource
 export node
 export elements
 export html_macros
@@ -45,3 +52,4 @@ export layout
 export form
 export validation
 export dom_bridge
+export reactive_wasm

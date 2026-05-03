@@ -19,7 +19,12 @@ proc createMemo*[T](compute: proc(): T {.closure.}): MemoPair[T] =
   proc getter(): T =
     addDependency(memo)
     if memo.dirty:
+      # Prevent memo.compute() from registering dependencies in the caller's computation.
+      # The memo's own computation (comp) already tracks these dependencies.
+      let prev = getCurrentComputation()
+      setCurrentComputation(nil)
       cachedValue = memo.compute()
+      setCurrentComputation(prev)
       memo.value = cachedValue
       memo.dirty = false
     return cachedValue
