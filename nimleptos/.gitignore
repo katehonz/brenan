@@ -30,6 +30,8 @@ nimblecache/
 examples/wasm_reactive.js
 examples/wasm_reactive.wasm
 examples/wasm_reactive
+examples/wasm_counter/*.js
+examples/wasm_counter/*.wasm
 examples/todo_app
 examples/blog/backend
 tests/*_test
@@ -43,7 +45,13 @@ src/nimleptos/macros/html_macros
 src/nimleptos/macros/html_macros.js
 src/nimleptos/macros/view_macros.js
 src/nimleptos/reactive/subscriber
+src/nimleptos/reactive/signal
+src/nimleptos/reactive/signal.wasm
+src/nimleptos/reactive/effects
+src/nimleptos/reactive/effects.wasm
 src/nimleptos/routing/route
 src/nimleptos/server/adapter
 src/nimleptos/server/app
 src/nimleptos/server/auth
+src/nimleptos/wasm/*.js
+src/nimleptos/wasm/*.wasm

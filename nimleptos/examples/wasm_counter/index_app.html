@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NimLeptos WASM — buildHtml Demo</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 600px; margin: 50px auto; padding: 0 20px; background: #1a1a2e; color: #eee; }
+  .title { color: #f0c040; font-size: 1.4em; }
+  h1 { margin-bottom: 0; }
+  #app { background: #16213e; border-radius: 12px; padding: 30px; margin-top: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+  .counter-app { text-align: center; }
+  .count-display { font-size: 3em; font-weight: bold; margin: 20px 0; transition: color 0.3s; }
+  .doubled-display { font-size: 1.2em; color: #aaa; margin-bottom: 20px; }
+  .buttons { display: flex; gap: 15px; justify-content: center; margin: 20px 0; }
+  button { font-size: 1.8em; width: 70px; height: 70px; border: none; border-radius: 50%; cursor: pointer; transition: transform 0.1s, background 0.2s; }
+  button:active { transform: scale(0.95); }
+  .btn-dec { background: #e74c3c; color: white; }
+  .btn-inc { background: #2ecc71; color: white; }
+  .btn-dec:hover { background: #c0392b; }
+  .btn-inc:hover { background: #27ae60; }
+  .info { color: #666; margin-top: 30px; font-size: 0.85em; }
+  .status { text-align: center; padding: 10px; border-radius: 6px; margin: 10px 0; }
+  .status.loading { background: #f39c12; color: #000; }
+  .status.ready { background: #27ae60; }
+</style>
+</head>
+<body>
+
+<h1><span class="title">⚡ NimLeptos</span> WASM — buildHtml</h1>
+<p>Full HTML DSL compiled to WebAssembly with reactive signals</p>
+
+<div class="status loading" id="status">Loading WASM module...</div>
+<div id="app"></div>
+
+<script src="wasm_app.js"></script>
+<script>
+// Nimbling-compatible element registry for EM_ASM DOM bridge
+var __nbgNextHandle = 0;
+var __nbgEls = {};
+
+// Initialize the Emscripten module
+NimLeptosWasm().then(function(Module) {
+  var statusEl = document.getElementById('status');
+  statusEl.textContent = 'WASM loaded. Mounting app...';
+  Module.ccall('mount', null, [], []);
+
+  // Wire up buttons (after DOM is rendered)
+  setTimeout(function() {
+    var btnInc = document.getElementById('btn-inc');
+    var btnDec = document.getElementById('btn-dec');
+    if (btnInc) btnInc.onclick = function() { Module.ccall('increment', null, [], []); };
+    if (btnDec) btnDec.onclick = function() { Module.ccall('decrement', null, [], []); };
+    statusEl.textContent = 'App mounted. Reactive system active.';
+    statusEl.className = 'status ready';
+  }, 100);
+});
+</script>
+
+</body>
+</html>

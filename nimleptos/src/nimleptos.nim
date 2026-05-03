@@ -20,6 +20,7 @@ import nimleptos/routing/route
 import nimleptos/routing/layout
 import nimleptos/forms/form
 import nimleptos/forms/validation
+import nimleptos/wasm/dom_bridge
 
 export signal
 export effects
@@ -43,3 +44,4 @@ export route
 export layout
 export form
 export validation
+export dom_bridge

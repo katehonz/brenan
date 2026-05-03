@@ -44,7 +44,7 @@ task blog, "Build and run blog example":
   exec "nim js -p:src -o:examples/blog/public/app.js examples/blog/frontend.nim"
   exec "nim c -r --threads:on -p:src examples/blog/backend.nim"
 
-task wasm, "Compile reactive core to WASM":
+task wasm, "Compile reactive core to WASM (basic signals+effects)":
   var emcc = findExe("emcc")
   if emcc == "":
     let emsdk = getEnv("EMSDK")
@@ -58,10 +58,58 @@ task wasm, "Compile reactive core to WASM":
       else:
         echo "Error: emcc not found. Install Emscripten (https://emscripten.org) and ensure it's in your PATH, set EMSDK env var, or install to ~/emsdk."
         quit(1)
-  exec "nim c --cpu:wasm32 --mm:arc -p:src " &
+  exec "nim c --cpu:wasm32 --mm:arc --threads:on -p:src " &
     "--cc:clang --clang.exe:" & emcc & " --clang.linkerexe:" & emcc & " " &
     "--passC:\"-sWASM=1\" " &
     "--passL:\"-sWASM=1 -sMODULARIZE=1 -sEXPORT_NAME='NimLeptosWasm' " &
     "-sEXPORTED_FUNCTIONS=['_main','_increment','_decrement','_getCount','_getDoubled'] " &
     "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']\" " &
     "-o:examples/wasm_reactive.js examples/wasm_reactive.nim"
+
+task wasmCounter, "Compile full WASM counter (signals + EM_ASM DOM updates + HTML)":
+  var emcc = findExe("emcc")
+  if emcc == "":
+    let emsdk = getEnv("EMSDK")
+    if emsdk != "":
+      emcc = emsdk / "upstream" / "emscripten" / "emcc"
+    else:
+      let home = getEnv("HOME")
+      let candidate = home / "emsdk" / "upstream" / "emscripten" / "emcc"
+      if fileExists(candidate):
+        emcc = candidate
+      else:
+        echo "Error: emcc not found. Install Emscripten (https://emscripten.org) and ensure it's in your PATH, set EMSDK env var, or install to ~/emsdk."
+        quit(1)
+  exec "nim c --cpu:wasm32 --mm:arc --threads:on -p:src " &
+    "--cc:clang --clang.exe:" & emcc & " --clang.linkerexe:" & emcc & " " &
+    "--passC:\"-sWASM=1\" " &
+    "--passL:\"-sWASM=1 -sMODULARIZE=1 -sEXPORT_NAME='NimLeptosWasm' " &
+    "-sEXPORTED_FUNCTIONS=['_main','_render','_increment','_decrement','_getCount'] " &
+    "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']\" " &
+    "-o:examples/wasm_counter/wasm_counter.js examples/wasm_counter/wasm_counter.nim"
+  echo ""
+  echo "Build complete. Open examples/wasm_counter/index.html in a browser."
+
+task wasmApp, "Compile WASM app using buildHtml macro + wasmRender (full DSL)":
+  var emcc = findExe("emcc")
+  if emcc == "":
+    let emsdk = getEnv("EMSDK")
+    if emsdk != "":
+      emcc = emsdk / "upstream" / "emscripten" / "emcc"
+    else:
+      let home = getEnv("HOME")
+      let candidate = home / "emsdk" / "upstream" / "emscripten" / "emcc"
+      if fileExists(candidate):
+        emcc = candidate
+      else:
+        echo "Error: emcc not found. Install Emscripten (https://emscripten.org) and ensure it's in your PATH, set EMSDK env var, or install to ~/emsdk."
+        quit(1)
+  exec "nim c --cpu:wasm32 --mm:arc --threads:on -p:src " &
+    "--cc:clang --clang.exe:" & emcc & " --clang.linkerexe:" & emcc & " " &
+    "--passC:\"-sWASM=1\" " &
+    "--passL:\"-sWASM=1 -sMODULARIZE=1 -sEXPORT_NAME='NimLeptosWasm' " &
+    "-sEXPORTED_FUNCTIONS=['_increment','_decrement','_getCount','_mount'] " &
+    "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']\" " &
+    "-o:examples/wasm_counter/wasm_app.js examples/wasm_counter/wasm_app.nim"
+  echo ""
+  echo "Build complete. Open examples/wasm_counter/index_app.html in a browser."
