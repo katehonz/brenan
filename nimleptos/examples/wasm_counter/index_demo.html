@@ -3,17 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NimLeptos WASM — Full Demo</title>
+<title>NimLeptos WASM Demo</title>
 <style>
   body { font-family: system-ui, sans-serif; max-width: 500px; margin: 50px auto; padding: 0 20px; background: #0f0f23; color: #ccc; }
-  .title { color: #f0c040; margin-bottom: 0; }
-  .subtitle { color: #666; font-size: 0.9em; margin-top: 0; }
-  #app { margin-top: 20px; }
-  .app { background: #1a1a3e; border-radius: 16px; padding: 30px; box-shadow: 0 4px 30px rgba(0,0,0,0.4); }
-  .counter-area { text-align: center; margin: 20px 0; }
+  .title { color: #f0c040; }
+  #app { background: #1a1a3e; border-radius: 16px; padding: 30px; margin-top: 20px; text-align: center; box-shadow: 0 4px 30px rgba(0,0,0,0.4); }
   .count { font-size: 5em; font-weight: 900; background: linear-gradient(135deg, #f0c040, #ff6b6b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
   .label { color: #888; font-size: 0.9em; text-transform: uppercase; letter-spacing: 2px; }
-  .memo-info { text-align: center; margin: 15px 0; padding: 10px; background: #0f0f23; border-radius: 8px; }
+  .memo-area { margin: 15px 0; padding: 10px; background: #0f0f23; border-radius: 8px; }
   .hot-badge { color: #ff6b6b; font-weight: bold; }
   .cool-badge { color: #2ecc71; font-weight: bold; }
   .buttons { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
@@ -30,30 +27,35 @@
 </head>
 <body>
 
-<h1 class="title">⚡ NimLeptos × WASM</h1>
-<p class="subtitle">Reactive signals, memos & if/else — all in WebAssembly</p>
+<h1 class="title">⚡ NimLeptos WASM Demo</h1>
+<p>Signals · memos · effects — all in WebAssembly</p>
 
-<div class="status loading" id="status">Loading WASM...</div>
-<div id="app"></div>
+<div class="status loading" id="status">Loading...</div>
 
-<script>
-// Element registry for WASM→DOM bridge
-var __nbgNextHandle = 0;
-var __nbgEls = {};
-</script>
+<div id="app">
+  <div class="count" id="count">0</div>
+  <div class="label">clicks</div>
+  <div class="memo-area" id="memo-area">Doubled: 0<br>Status: <span class="cool-badge">cool</span></div>
+  <div class="buttons">
+    <button class="btn-dec" id="btn-dec">-</button>
+    <button class="btn-reset" id="btn-reset">0</button>
+    <button class="btn-inc" id="btn-inc">+</button>
+  </div>
+</div>
+
 <script src="wasm_demo.js"></script>
 <script>
 WasmDemo().then(function(Module) {
   var s = document.getElementById('status');
-  s.textContent = 'Mounting...';
+  s.textContent = 'WASM loaded. Initializing...';
 
-  Module.ccall('mount', null, [], []);
+  Module.ccall('render', null, [], []);
 
   setTimeout(function() {
     document.getElementById('btn-inc').onclick = function() { Module.ccall('increment', null, [], []); };
     document.getElementById('btn-dec').onclick = function() { Module.ccall('decrement', null, [], []); };
     document.getElementById('btn-reset').onclick = function() { Module.ccall('reset', null, [], []); };
-    s.textContent = 'Reactive system active. Nim signals + WASM.';
+    s.textContent = 'Reactive system active. Nim signals in WASM.';
     s.className = 'status ready';
   }, 50);
 });

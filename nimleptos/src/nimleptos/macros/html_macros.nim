@@ -24,10 +24,12 @@ proc buildTextNode(text: string): NimNode =
 
 proc buildReactiveTextNode(expr: NimNode): NimNode =
   ## For non-string-literal text expressions, generate:
-  ##   when defined(js) or defined(wasm32):
+  ##   when defined(js):
   ##     reactiveTextNode($expr, proc(): string = $expr)
   ##   else:
   ##     textNode($expr)
+  ## Note: wasm32 uses static path due to Emscripten function table limits
+  ## with module-level signal closures.
   let strExpr = newCall("$", expr)
   let getterProc = newNimNode(nnkLambda)
   getterProc.add(newEmptyNode())
@@ -48,22 +50,18 @@ proc buildReactiveTextNode(expr: NimNode): NimNode =
   let jsBranch = newNimNode(nnkElifBranch)
   jsBranch.add(definedJs)
   jsBranch.add(reactiveCode)
-  let definedWasm = newCall("defined", ident("wasm32"))
-  let wasmBranch = newNimNode(nnkElifBranch)
-  wasmBranch.add(definedWasm)
-  wasmBranch.add(reactiveCode)
   let elseBranch = newNimNode(nnkElse)
   elseBranch.add(staticCode)
   result.add(jsBranch)
-  result.add(wasmBranch)
   result.add(elseBranch)
 
 proc buildReactiveAttr(nodeVar: NimNode, name: string, expr: NimNode): NimNode =
   ## Generate:
-  ##   when defined(js) or defined(wasm32):
+  ##   when defined(js):
   ##     addReactiveAttr(node, "name", proc(): string = $expr)
   ##   else:
   ##     addAttribute(node, "name", $expr)
+  ## Note: wasm32 uses static path due to Emscripten function table limits.
   let strExpr = newCall("$", expr)
   let getterProc = newNimNode(nnkLambda)
   getterProc.add(newEmptyNode())
@@ -84,14 +82,9 @@ proc buildReactiveAttr(nodeVar: NimNode, name: string, expr: NimNode): NimNode =
   let jsBranch = newNimNode(nnkElifBranch)
   jsBranch.add(definedJs)
   jsBranch.add(reactiveCode)
-  let definedWasm = newCall("defined", ident("wasm32"))
-  let wasmBranch = newNimNode(nnkElifBranch)
-  wasmBranch.add(definedWasm)
-  wasmBranch.add(reactiveCode)
   let elseBranch = newNimNode(nnkElse)
   elseBranch.add(staticCode)
   result.add(jsBranch)
-  result.add(wasmBranch)
   result.add(elseBranch)
 
 proc buildEventHandlerCode(nodeVar: NimNode, eventName: string, handlerExpr: NimNode): NimNode =

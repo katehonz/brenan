@@ -90,7 +90,7 @@ task wasmCounter, "Compile full WASM counter (signals + EM_ASM DOM updates + HTM
   echo ""
   echo "Build complete. Open examples/wasm_counter/index.html in a browser."
 
-task wasmApp, "Compile WASM app using buildHtml macro + wasmRender (full DSL)":
+task wasmApp, "Compile WASM app with reactive effects + DOM updates":
   var emcc = findExe("emcc")
   if emcc == "":
     let emsdk = getEnv("EMSDK")
@@ -108,7 +108,7 @@ task wasmApp, "Compile WASM app using buildHtml macro + wasmRender (full DSL)":
     "--cc:clang --clang.exe:" & emcc & " --clang.linkerexe:" & emcc & " " &
     "--passC:\"-sWASM=1\" " &
     "--passL:\"-sWASM=1 -sMODULARIZE=1 -sEXPORT_NAME='NimLeptosWasm' " &
-    "-sEXPORTED_FUNCTIONS=['_increment','_decrement','_getCount','_mount'] " &
+    "-sEXPORTED_FUNCTIONS=['_main','_increment','_decrement','_getCount','_render'] " &
     "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']\" " &
     "-o:examples/wasm_counter/wasm_app.js examples/wasm_counter/wasm_app.nim"
   echo ""
