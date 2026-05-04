@@ -22,7 +22,7 @@
 | Client Router (hash-based) | ⚠️ Базов | работи, но няма history API mode |
 | WebSocket Realtime Signals | ⚠️ Базов | ServerSignal + broadcast, но няма reconnect logic |
 | WASM (Nimbling) | ⚠️ Експериментален | reactive core се export-ва, DOM е JS-side |
-| WASM (Emscripten) | ❌ Не се поддържа | отказан в полза на Nimbling (виж `AGENTS.md` #6) |
+| WASM (nimbling) | ✅ Поддържа се | WASI SDK + nimbling CLI |
 | Performance Benchmarks | ❌ Липсват | няма сравнение с Karax, HappyX, Solid |
 | CI/CD | ❌ Липсва | ръчно пускане на `nimble test` |
 | Developer Tools / Debug | ❌ Липсват | няма DevTools extension или debug utils |
@@ -206,7 +206,7 @@ src/nimleptos/i18n/
 | Среден | Extract `HtmlNode` от `dom/` + `ssr/` + `client/` в един тип | `renderToHtml` (SSR) и `renderDomNode` (client) имат parallel logic | Създай `HtmlNodeRenderer` concept или base methods |
 | Нисък | Rename `nimleptos.nim` main export файл | В момента `src/nimleptos.nim` е root, но папката е `src/nimleptos/` | Стандартна Nim структура — `src/nimleptos.nim` re-exports всичко |
 | Нисък | Standardize proc naming: `createXxx` vs `newXxx` vs `elXxx` | `createSignal` но `newNimLeptosApp` — несъвместим conventions | Реши един стандарт и документирай в `AGENTS.md` |
-| Нисък | Remove Emscripten tasks от `nimleptos.nimble` | Emscripten не се поддържа вече | Премести в `nimleptos.nimble.emscripten_legacy` или изтрий |
+| Нисък | Почисти Emscripten остатъци | ✅ Изтрито | — |
 
 ---
 
@@ -284,7 +284,7 @@ nimble nimblingReactive             # WASM pipeline не чупи (compile-only)
 |------|------------|
 | `AGENTS.md` | Правила за AI — стил, архитектурни капани |
 | `PLAN.md` | Текущ проектен статус, реализирани фази |
-| `WASM.md` | WASM компилация — стари Emscripten notes |
+| `WASM.md` | WASM компилация — nimbling integration guide |
 | `NIMMAX_BACKEND_RECOMMENDATIONS.md` | NimMax backend guidelines |
 | `CODE_REVIEW.md` | Ревю бележки |
 | `docs/*.md` | Компонентна документация |

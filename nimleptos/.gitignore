@@ -56,6 +56,11 @@ src/nimleptos/server/auth
 src/nimleptos/wasm/*.js
 src/nimleptos/wasm/*.wasm
 
+# Nimbling build artifacts
+*.nbg
+examples/nimbling_reactive/pkg/
+examples/nimbling_counter/pkg/
+
 # Additional build artifacts
 src/nimleptos.out
 src/nimleptos/client/reactive_dom.js

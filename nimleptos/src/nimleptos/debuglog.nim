@@ -3,7 +3,6 @@
 ## Provides `debugLog` and `debugTrace` procs that are:
 ## - Native: `echo` when `-d:nimleptosDebug` is set, no-op otherwise
 ## - JS: `console.log` when `-d:nimleptosDebug` is set, no-op otherwise
-## - WASM (Emscripten): `EM_ASM({ console.log(...) })` when `-d:nimleptosDebug`
 ## - WASM (Nimbling/standalone): `rawOutput` via panicoverride when `-d:nimleptosDebug`
 ##
 ## Usage:
