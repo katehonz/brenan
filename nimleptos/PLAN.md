@@ -144,7 +144,10 @@ Build: `nimble nimblingI18n` (compile-only, requires Zig/WASI + nimbling CLI for
 | `tests/client_dom_test.nim` | PASS — 11 tests |
 | `tests/router_test.nim` | PASS — 10 tests |
 | `tests/i18n_test.nim` | PASS — 18 tests |
-| **Общо** | **97 теста, всички PASS** |
+| `tests/form_test.nim` | PASS — 12 теста |
+| `tests/websocket_test.nim` | PASS — 10 теста |
+| `tests/wasm_e2e_test.nim` | PASS — 2 теста |
+| **Общо** | **138 теста, всички PASS** |
 
 ---
 

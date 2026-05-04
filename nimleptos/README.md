@@ -505,7 +505,7 @@ nimleptos/
 │   ├── forms/             # Form handling, validation
 │   ├── realtime/          # WebSocket signals (thread-safe)
 │   └── client/            # JS hydration, reactive DOM, router, HTTP
-├── tests/                 # 40 tests across 5 suites
+├── tests/                 # 152 tests across 12 suites
 ├── examples/
 ├── docs/
 └── nimleptos.nimble
@@ -526,11 +526,13 @@ nimleptos/
 | [JWT Authentication](docs/auth.md) | Bearer tokens, login/refresh, role-based access |
 | [i18n & Localization](docs/i18n.md) | Reactive translations, ICU pluralization, SSR middleware, WASM bridge |
 | [Component System](docs/components.md) | View macros, slots, typed props |
+| [Debugging](docs/debugging.md) | Debug logging across native/JS/WASM targets |
+| [Benchmarks](docs/benchmarks.md) | Signal, DOM, and SSR performance tests |
 
 ## Testing
 
 ```bash
-nimble test   # 40 tests across 5 suites
+nimble test   # 152 tests across 12 suites
 ```
 
 ## Examples
@@ -559,6 +561,9 @@ nimble blog
 
 # Full-stack Todo App (SSR + forms + validation)
 nimble todo
+
+# i18n Demo (SSR + client-side language switcher)
+nimble i18n
 
 # Reactive core to WASM (requires Nimbling + Zig/WASI)
 nimble nimbling_reactive

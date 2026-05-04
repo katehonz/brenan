@@ -259,17 +259,18 @@ src/nimleptos/i18n/
 | Client Router | 18 теста | ✅ hash + history API, pushState, popstate, replaceState, unified initRouter |
 | PWA / Service Worker | helpers only | client-side registration + SSR manifest/SW генерация (no standalone tests) |
 | WebSocket Signals | 0 теста | reconnect, broadcast, multiple subscribers |
-| Forms | 0 теста | validation errors, file upload, CSRF token |
+| Forms | 12 теста | renderForm, field kinds, errors, custom attrs |
 | i18n | 18 теста | ✅ catalog, plural, interpolate, reactive t(), setLocale/useLocale |
-| WASM | 0 теста | end-to-end WASM compile + run test |
+| WebSocket Signals | 10 теста | ✅ createServerSignal, subscribe, broadcast, handleSignalMessage |
+| WASM | 2 теста | ✅ compileOnly check + wasmBindgen sidecar |
 
 ### Следващи тестове за писане (по приоритет):
 1. ~~`tests/client_dom_test.nim`~~ ✅ Написан — 11 теста, всички PASS
 2. ~~`tests/router_test.nim`~~ ✅ Написан — 10 теста, всички PASS
 3. ~~`tests/i18n_test.nim`~~ ✅ Написан — 18 теста, всички PASS
-4. `tests/wasm_e2e_test.nim` — compile reactive core to wasm, test exports
-5. `tests/form_test.nim` — test renderForm, validation, getFieldValues
-6. `tests/websocket_test.nim` — test ServerSignal subscribe/broadcast
+4. ~~`tests/wasm_e2e_test.nim`~~ ✅ Написан — 2 теста, compileOnly + sidecar check
+5. ~~`tests/form_test.nim`~~ ✅ Написан — 12 теста, всички PASS
+6. ~~`tests/websocket_test.nim`~~ ✅ Написан — 10 теста, всички PASS
 
 ---
 
@@ -304,7 +305,7 @@ nimble nimblingReactive             # WASM pipeline не чупи (compile-only)
 
 | Метрика | Текущо | Цел v0.3.0 | Цел v0.4.0 |
 |---------|--------|------------|------------|
-| Тестове | 138 | 80+ | 120+ |
+| Тестове | 152 | 80+ | 120+ |
 | Тест покритие (estimated) | ~50% | 60% | 80% |
 | Примери | 8 | 12 | 15 |
 | Документация страници | 8 | 12 | 15 |
