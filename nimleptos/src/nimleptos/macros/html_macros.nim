@@ -1,7 +1,9 @@
 import std/macros
 import std/strutils
 import std/tables
+import std/json
 import ../dom/node
+import ../i18n/catalog
 
 export node
 
@@ -13,11 +15,30 @@ const eventAttrMap = {
   "onmouseover": "mouseover", "ondblclick": "dblclick",
 }.toTable
 
+# Compile-time i18n catalog for buildHtml key validation
+var i18nCompileTimeKeys {.compileTime.}: seq[string] = @[]
+var i18nCompileTimeEnabled {.compileTime.}: bool = false
+
 proc isEventAttr(name: string): bool =
   name.toLowerAscii in eventAttrMap
 
 proc getEventName(attrName: string): string =
   eventAttrMap.getOrDefault(attrName.toLowerAscii, "")
+
+macro registerI18nCatalog*(path: static string) =
+  ## Register an i18n JSON catalog for compile-time key validation in buildHtml.
+  ## Call this once at module scope before using t"..." in buildHtml macros.
+  let content = staticRead(path)
+  let jsonNode = parseJson(content)
+  i18nCompileTimeEnabled = true
+  i18nCompileTimeKeys = @[]
+  let defaultLocale = jsonNode{"defaultLocale"}.getStr("en")
+  let messagesNode = jsonNode{"messages"}
+  if messagesNode.kind == JObject:
+    let localeMsgs = messagesNode{defaultLocale}
+    if localeMsgs.kind == JObject:
+      for msgKey, _ in localeMsgs.pairs:
+        i18nCompileTimeKeys.add($msgKey)
 
 proc buildTextNode(text: string): NimNode =
   newCall("textNode", newStrLitNode(text))
@@ -47,6 +68,47 @@ proc buildReactiveTextNode(expr: NimNode): NimNode =
   elseBranch.add(staticCode)
   result.add(jsBranch)
   result.add(elseBranch)
+
+proc buildReactiveI18nNode(tCall: NimNode): NimNode =
+  ## Build a reactive text node from an i18n call (t or tp).
+  ## tCall must be a NimNode that evaluates to proc(): string (Getter[string]).
+  let initialExpr = newCall(tCall)  # Call the getter for initial value
+  let reactiveCode = newCall("reactiveTextNode", initialExpr, tCall)
+  let staticCode = newCall("textNode", initialExpr)
+
+  result = newNimNode(nnkWhenStmt)
+  let definedJs = newCall("defined", ident("js"))
+  let jsBranch = newNimNode(nnkElifBranch)
+  jsBranch.add(definedJs)
+  jsBranch.add(reactiveCode)
+  let elseBranch = newNimNode(nnkElse)
+  elseBranch.add(staticCode)
+  result.add(jsBranch)
+  result.add(elseBranch)
+
+proc buildI18nChild(cfgNode: NimNode, callee: string, keyNode: NimNode): NimNode =
+  ## Helper to build reactive i18n text node from a key node (StrLit or RStrLit).
+  if keyNode.kind notin {nnkStrLit, nnkRStrLit}:
+    error("i18n key must be a string literal", keyNode)
+  let key = if keyNode.kind == nnkRStrLit: keyNode.strVal else: $keyNode
+  if i18nCompileTimeEnabled and key notin i18nCompileTimeKeys:
+    error("i18n key not found in catalog: " & key, keyNode)
+  if callee == "t":
+    let tCall = newCall("t", cfgNode, newStrLitNode(key))
+    result = buildReactiveI18nNode(tCall)
+  else:
+    let emptyParams = newNimNode(nnkLambda)
+    emptyParams.add(newEmptyNode())
+    emptyParams.add(newEmptyNode())
+    emptyParams.add(newEmptyNode())
+    let emptyParamsFormal = newNimNode(nnkFormalParams)
+    emptyParamsFormal.add(newNimNode(nnkBracketExpr).add(ident("Table")).add(ident("string")).add(ident("string")))
+    emptyParams.add(emptyParamsFormal)
+    emptyParams.add(newEmptyNode())
+    emptyParams.add(newEmptyNode())
+    emptyParams.add(newStmtList(newCall("initTable", ident("string"), ident("string"))))
+    let tpCall = newCall("tp", cfgNode, newStrLitNode(key), emptyParams)
+    result = buildReactiveI18nNode(tpCall)
 
 proc buildReactiveAttr(nodeVar: NimNode, name: string, expr: NimNode): NimNode =
   let strExpr = newCall("$", expr)
@@ -133,7 +195,7 @@ proc parseAttrs(args: NimNode, startIdx: int, extractBody: var NimNode): (seq[(s
       extractBody = arg
   result = (staticAttrs, reactiveAttrs, events)
 
-proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)], reactiveAttrs: seq[(string, NimNode)], events: seq[(string, NimNode)], children: seq[NimNode]] =
+proc extractAttrsAndBody(body: NimNode, cfgNode: NimNode = nil): tuple[staticAttrs: seq[(string, string)], reactiveAttrs: seq[(string, NimNode)], events: seq[(string, NimNode)], children: seq[NimNode]] =
   result.staticAttrs = @[]
   result.reactiveAttrs = @[]
   result.events = @[]
@@ -152,6 +214,28 @@ proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)
           result.children.add(buildTextNode($child[1]))
         else:
           result.children.add(buildReactiveTextNode(child[1]))
+      elif $child[0] == "t" and child.len >= 2:
+        if cfgNode == nil:
+          error("i18n t\"...\" syntax requires buildHtml(cfg) overload. Use t(cfg, \"...\") with the single-argument buildHtml, or pass the I18nConfig as first argument.", child)
+        result.children.add(buildI18nChild(cfgNode, "t", child[1]))
+      elif $child[0] == "tp" and child.len >= 2:
+        if cfgNode == nil:
+          error("i18n tp\"...\" syntax requires buildHtml(cfg) overload. Use tp(cfg, \"...\", paramsFn) with the single-argument buildHtml, or pass the I18nConfig as first argument.", child)
+        result.children.add(buildI18nChild(cfgNode, "tp", child[1]))
+      else:
+        result.children.add(buildReactiveTextNode(child))
+    of nnkCallStrLit:
+      let callee = $child[0]
+      if callee == "t" and child.len == 2:
+        if cfgNode == nil:
+          error("i18n t\"...\" syntax requires buildHtml(cfg) overload. Use t(cfg, \"...\") with the single-argument buildHtml, or pass the I18nConfig as first argument.", child)
+        result.children.add(buildI18nChild(cfgNode, "t", child[1]))
+      elif callee == "tp" and child.len == 2:
+        if cfgNode == nil:
+          error("i18n tp\"...\" syntax requires buildHtml(cfg) overload. Use tp(cfg, \"...\", paramsFn) with the single-argument buildHtml, or pass the I18nConfig as first argument.", child)
+        result.children.add(buildI18nChild(cfgNode, "tp", child[1]))
+      else:
+        result.children.add(buildReactiveTextNode(child))
     of nnkCall:
       let callee = $child[0]
       if callee == "text" and child.len >= 2:
@@ -159,6 +243,14 @@ proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)
           result.children.add(buildTextNode($child[1]))
         else:
           result.children.add(buildReactiveTextNode(child[1]))
+        continue
+      elif callee == "t" and child.len == 3 and child[2].kind == nnkStrLit:
+        let tCall = newCall("t", child[1], child[2])
+        result.children.add(buildReactiveI18nNode(tCall))
+        continue
+      elif callee == "tp" and child.len == 4 and child[2].kind == nnkStrLit:
+        let tpCall = newCall("tp", child[1], child[2], child[3])
+        result.children.add(buildReactiveI18nNode(tpCall))
         continue
 
       var tagName: string
@@ -174,7 +266,7 @@ proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)
         tagName = callee
         (sAttrs, rAttrs, evts) = parseAttrs(child, 1, nestedBody)
 
-      let (nestedStaticAttrs, nestedReactiveAttrs, nestedEvents, nestedChildren) = extractAttrsAndBody(nestedBody)
+      let (nestedStaticAttrs, nestedReactiveAttrs, nestedEvents, nestedChildren) = extractAttrsAndBody(nestedBody, cfgNode)
       for a in nestedStaticAttrs: sAttrs.add(a)
       for a in nestedReactiveAttrs: rAttrs.add(a)
       for e in nestedEvents: evts.add(e)
@@ -189,7 +281,7 @@ proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)
       var elseNode: NimNode = nil
       if child.len > 1 and child[1].kind == nnkElse:
         let elseBody = child[1][0]
-        let (_, _, _, elseChildren) = extractAttrsAndBody(elseBody)
+        let (_, _, _, elseChildren) = extractAttrsAndBody(elseBody, cfgNode)
         if elseChildren.len == 1:
           elseNode = elseChildren[0]
         elif elseChildren.len > 1:
@@ -200,7 +292,7 @@ proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)
       if elseNode == nil:
         elseNode = newCall("elementNode", newStrLitNode("div"))
 
-      let (_, _, _, thenChildren) = extractAttrsAndBody(thenBody)
+      let (_, _, _, thenChildren) = extractAttrsAndBody(thenBody, cfgNode)
       var thenNode: NimNode
       if thenChildren.len == 1:
         thenNode = thenChildren[0]
@@ -223,6 +315,37 @@ proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)
       let condNode = newCall("conditionalNode", conditionProc, thenNode, elseNode)
       condNode.copyLineInfo(child)
       result.children.add(condNode)
+    of nnkForStmt:
+      if child.len != 3:
+        error("buildHtml for loop must have exactly one loop variable and one iterable expression", child)
+      let loopVar = child[0]
+      let iterExpr = child[1]
+      let loopBody = child[2]
+
+      let (_, _, _, loopChildren) = extractAttrsAndBody(loopBody, cfgNode)
+
+      let listGetter = newNimNode(nnkLambda)
+      listGetter.add(newEmptyNode())
+      listGetter.add(newEmptyNode())
+      listGetter.add(newEmptyNode())
+      let formalParams = newNimNode(nnkFormalParams)
+      formalParams.add(newNimNode(nnkBracketExpr).add(ident("seq")).add(ident("HtmlNode")))
+      listGetter.add(formalParams)
+      listGetter.add(newEmptyNode())
+      listGetter.add(newEmptyNode())
+
+      let loopResultBody = newStmtList()
+      for lc in loopChildren:
+        loopResultBody.add(newCall("add", ident("result"), lc))
+      let forLoop = newNimNode(nnkForStmt)
+      forLoop.add(loopVar)
+      forLoop.add(iterExpr)
+      forLoop.add(loopResultBody)
+      listGetter.add(newStmtList(forLoop))
+
+      let listNodeCall = newCall("listNode", listGetter)
+      listNodeCall.copyLineInfo(child)
+      result.children.add(listNodeCall)
     of nnkInfix, nnkPrefix:
       result.children.add(buildReactiveTextNode(child))
     of nnkIdent, nnkDotExpr, nnkBracketExpr, nnkPar, nnkCast, nnkObjConstr, nnkCurly, nnkLambda:
@@ -231,7 +354,7 @@ proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)
       result.children.add(newCall("textNode", newCall("$", child)))
 
 macro html*(body: untyped): untyped =
-  let (staticAttrs, reactiveAttrs, events, children) = extractAttrsAndBody(body)
+  let (staticAttrs, reactiveAttrs, events, children) = extractAttrsAndBody(body, nil)
   if children.len == 1:
     result = children[0]
   elif children.len > 1:
@@ -246,7 +369,26 @@ macro buildHtml*(body: untyped): untyped =
   ## and generates reactiveTextNode / addReactiveAttr when compiled with nim js.
   ## Event attributes (onClick, onInput, etc.) are detected and generate
   ## addDomEvent calls for client-side rendering.
-  let (staticAttrs, reactiveAttrs, events, children) = extractAttrsAndBody(body)
+  ##
+  ## For i18n support, use the two-argument overload:
+  ##   buildHtml(cfg):
+  ##     el("h1"): t"hello"
+  let (staticAttrs, reactiveAttrs, events, children) = extractAttrsAndBody(body, nil)
+  if children.len == 1:
+    result = children[0]
+  elif children.len > 1:
+    result = buildElementCall("div", staticAttrs, reactiveAttrs, events, children)
+  else:
+    result = newCall("elementNode", newStrLitNode("div"))
+  result.copyLineInfo(body)
+
+macro buildHtml*(i18nCfg: untyped, body: untyped): untyped =
+  ## Build an HtmlNode tree with i18n support.
+  ## Usage:
+  ##   let node = buildHtml(cfg):
+  ##     el("h1"): t"hello"
+  ##     el("p"): tp"greeting"
+  let (staticAttrs, reactiveAttrs, events, children) = extractAttrsAndBody(body, i18nCfg)
   if children.len == 1:
     result = children[0]
   elif children.len > 1:
@@ -272,6 +414,6 @@ macro el*(args: varargs[untyped]): untyped =
     error("tag name cannot be empty", tagArg)
   var body: NimNode = nil
   let (sAttrs, rAttrs, evts) = parseAttrs(args, 1, body)
-  let (_, _, _, children) = extractAttrsAndBody(body)
+  let (_, _, _, children) = extractAttrsAndBody(body, nil)
   result = buildElementCall(tag, sAttrs, rAttrs, evts, children)
   result.copyLineInfo(tagArg)

@@ -20,11 +20,15 @@ Phase 16: i18n core implemented — `src/nimleptos/i18n/` (5 модула: catal
   - Reactive translation: `t()`, `tp()`, `setLocale()`, `useLocale()`
   - Interpolation с placeholder-и `{name}`
   - Locale detection middleware (URL prefix, Cookie, Accept-Language)
+  - **16.5 DONE:** `buildHtml(cfg)` i18n macro — `t"hello"`, `tp"hello"`, compile-time key validation via `registerI18nCatalog`
 
 Router tests added: `tests/router_test.nim` — 10 tests (hash route, navigate, initHashRouter, routeParam edge cases).
 i18n tests added: `tests/i18n_test.nim` — 18 tests (catalog, plural, interpolate, reactive t(), setLocale/useLocale).
 
-Всички фази са реализирани и тестовете минават (97 теста, 9 suite-а).
+Phase 17.1: Resource cancellation / race protection — `pendingFetchId` + `lastCompletedFetchId`.
+Phase 17.2: `for` macro in `buildHtml` — `listNode` type, reactive list rendering in DOM, SSR support.
+
+Всички фази са реализирани и тестовете минават (107 теста, 9 suite-а).
 
 ---
 
@@ -116,7 +120,7 @@ i18n tests added: `tests/i18n_test.nim` — 18 tests (catalog, plural, interpola
 | Тест | Статус |
 |------|--------|
 | `tests/signal_test.nim` | PASS — 5 tests |
-| `tests/macros_test.nim` | PASS — 12 tests |
+| `tests/macros_test.nim` | PASS — 15 tests (including i18n buildHtml macro tests) |
 | `tests/ssr_test.nim` | PASS — 5 tests |
 | `tests/server_test.nim` | PASS — 9 tests |
 | `tests/reactive_ext_test.nim` | PASS — 18 tests |
@@ -142,6 +146,8 @@ i18n tests added: `tests/i18n_test.nim` — 18 tests (catalog, plural, interpola
 | `examples/nimbling_reactive/` | Reactive core в WASM чрез Nimbling — signals + effects, JS контролира DOM |
 | `examples/todo_app.nim` | Full-stack Todo App — SSR + forms + validation + REST API |
 | `examples/blog/` | Blog App — NimMax REST API + NimLeptos CSR + hash router + fetch client |
+| `examples/i18n_app.nim` | i18n Demo — SSR с Accept-Language detection + client-side language switcher + pluralization |
+| `examples/i18n_client.nim` | i18n Client App — reactive DOM с `buildHtml(cfg)`, `t"hello"`, `tp`, pluralization |
 
 ---
 

@@ -38,6 +38,8 @@ type
     setState: Setter[ResourceState]
     fetcher: proc(): T {.closure.}
     sourceComp: Computation
+    pendingFetchId*: int  ## Monotonically increasing fetch ID for cancellation/race protection
+    lastCompletedFetchId*: int
 
 proc value*[T](res: Resource[T]): T =
   ## Returns the current value of the resource. Reactive — tracked in effects.
@@ -61,26 +63,40 @@ proc state*[T](res: Resource[T]): ResourceState =
 
 proc refetch*[T](res: Resource[T]) =
   ## Manually triggers a re-fetch.
+  ## If the fetcher is asynchronous (or if multiple refetches are triggered
+  ## rapidly), only the result of the most recent fetch is applied.
+  inc res.pendingFetchId
+  let myFetchId = res.pendingFetchId
   res.setState(rsLoading)
   res.setLoading(true)
+
   when defined(wasm32):
     ## Wasm without full exception support — fetcher errors are fatal.
     let val = res.fetcher()
+    if myFetchId != res.pendingFetchId:
+      return  # stale fetch, ignore result
     res.currentValue = val
     res.setValue(val)
     res.setState(rsReady)
     res.setError("")
     res.setLoading(false)
+    res.lastCompletedFetchId = myFetchId
   else:
     try:
       let val = res.fetcher()
+      if myFetchId != res.pendingFetchId:
+        return  # stale fetch, ignore result
       res.currentValue = val
       res.setValue(val)
       res.setState(rsReady)
       res.setError("")
+      res.lastCompletedFetchId = myFetchId
     except:
+      if myFetchId != res.pendingFetchId:
+        return  # stale fetch, ignore error
       res.setError(getCurrentExceptionMsg())
       res.setState(rsError)
+      res.lastCompletedFetchId = myFetchId
     finally:
       res.setLoading(false)
 
@@ -106,6 +122,8 @@ proc createResource*[T](fetcher: proc(): T {.closure.}): Resource[T] =
     setError: se,
     setState: sst,
     fetcher: fetcher,
+    pendingFetchId: 0,
+    lastCompletedFetchId: 0,
   )
 
   res.refetch()
@@ -119,6 +137,9 @@ proc createResource*[S, T](
   ##
   ## Whenever the source signal changes, the resource automatically refetches
   ## by calling fetcher with the new source value.
+  ##
+  ## If the source changes before a previous fetch completes, the stale
+  ## fetch result is discarded (race condition protection).
   ##
   ## Example:
   ##   let (page, setPage) = createSignal(1)
@@ -143,6 +164,8 @@ proc createResource*[S, T](
     setError: se,
     setState: sst,
     fetcher: proc(): T = fetcher(source()),
+    pendingFetchId: 0,
+    lastCompletedFetchId: 0,
   )
 
   res.refetch()

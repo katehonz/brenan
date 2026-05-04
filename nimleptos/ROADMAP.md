@@ -121,9 +121,10 @@ src/nimleptos/i18n/
   - `tp(cfg, key, paramsFn)` — reactive translation с interpolation
   - `useLocale()` — getter за текущ locale signal
   - `setLocale(locale)` — превключва locale и notify-ва всички `t()` calls
-- [ ] **16.5** `buildHtml` i18n макро
-  - `<h1>{t"hello"}</h1>` или `<h1>${"hello"}</h1>` синтаксис в `buildHtml`
-  - Compile-time check: ако ключът не съществува в default catalog → компилационна грешка
+- [x] **16.5** `buildHtml` i18n макро
+  - ✅ `t"hello"` и `tp"hello"` синтаксис в `buildHtml(cfg)` overload
+  - ✅ `t(cfg, "hello")` и `tp(cfg, "hello", paramsFn)` в `buildHtml`
+  - ✅ Compile-time check чрез `registerI18nCatalog`: ако ключът не съществува в default catalog → компилационна грешка
 - [x] **16.6** Pluralization
   - ✅ ICU MessageFormat: `one#1 item|other#{count} items`
   - ✅ `resolvePlural(locale, n)` — EN, BG, RU, AR, FR правила
@@ -136,23 +137,29 @@ src/nimleptos/i18n/
   - DOM текстът се update-ва от JS glue при locale change
 
 #### Интеграция
-- [ ] **16.8** `examples/i18n_app.nim`
-  - SSR страница с `Accept-Language` detection
-  - Client-side language switcher с `setLocale`
-  - Reactive pluralization demo
+- [x] **16.8** `examples/i18n_app.nim`
+  - ✅ SSR страница с `Accept-Language` detection чрез `localeMiddleware`
+  - ✅ Client-side language switcher с `setLocale` (compiled to JS)
+  - ✅ Reactive pluralization demo с `resolvePlural` + `parsePluralMessage`
+  - ✅ `examples/i18n_client.nim` — reactive DOM app с `buildHtml(cfg)`
+  - ✅ `nimble i18n` task за build + run
 - [x] **16.9** `tests/i18n_test.nim`
   - ✅ 18 tests: catalog loading, interpolation, pluralization, reactive t(), setLocale, useLocale
 
 ### Фаза 17: Advanced Reactive Features (Q3 2026)
 **Цел:** Feature parity с Leptos/Solid примитиви.
 
-- [ ] **17.1** `createResource` with `source` signal (вече има, но няма cancellation)
-  - Когато `source` се промени преди fetch да завърши, cancel стария fetch
-  - Това изисква или `async` cancellation token, или sync fetch само
-- [ ] **17.2** `Show` / `For` components (control flow macros)
-  - `when` макро за conditional rendering в `buildHtml` — вече има (`conditional_client.nim`)
-  - `for` макро за list rendering с keyed updates
-  - `switch` / `match` макро за pattern matching
+- [x] **17.1** `createResource` with `source` signal — cancellation / race protection
+  - ✅ `pendingFetchId` + `lastCompletedFetchId` в `Resource[T]`
+  - ✅ Stale fetch results се игнорират при бърза смяна на `source`
+  - ✅ Тест `testResourceCancellation`
+- [x] **17.2** `Show` / `For` components (control flow macros)
+  - ✅ `when` / `if` макро за conditional rendering — вече има
+  - ✅ `for` макро за list rendering в `buildHtml`
+  - ✅ `listNode` тип + `renderDomNode` reactive list rendering (JS target)
+  - ✅ `renderToHtml` / `renderToHtmlRaw` list rendering (SSR/native)
+  - ✅ Тестове: `testForMacro`, `testForMacroNested`
+  - `switch` / `match` макро — deferred за по-късна фаза
 - [ ] **17.3** `onCleanup` / `onMount` lifecycle hooks
   - Изпълнява се когато компонент се mount/unmount от DOM
   - Важно за EventListener cleanup, WebSocket unsubscribe
@@ -265,7 +272,7 @@ nimble nimblingReactive             # WASM pipeline не чупи (compile-only)
 
 | Метрика | Текущо | Цел v0.3.0 | Цел v0.4.0 |
 |---------|--------|------------|------------|
-| Тестове | 97 | 80+ | 120+ |
+| Тестове | 107 | 80+ | 120+ |
 | Тест покритие (estimated) | ~50% | 60% | 80% |
 | Примери | 8 | 12 | 15 |
 | Документация страници | 8 | 12 | 15 |

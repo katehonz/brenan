@@ -1,7 +1,11 @@
 import std/strutils
+import std/tables
 import ../src/nimleptos/dom/node
 import ../src/nimleptos/dom/elements
 import ../src/nimleptos/macros/html_macros
+import ../src/nimleptos/i18n/catalog
+import ../src/nimleptos/i18n/interpolate
+import ../src/nimleptos/i18n/i18n
 
 proc testTextNode() =
   let node = textNode("Hello")
@@ -110,6 +114,85 @@ proc testConditionalMacro() =
   doAssert html2.contains("<p>Anonymous</p>")
   echo "PASS: conditional macro (else branch)"
 
+proc testI18nBuildHtmlWithCfgMacro() =
+  let cat = newMessageCatalog("en", "en")
+  cat.addTranslation("en", "hello", "Hello")
+  cat.addTranslation("en", "home", "Home")
+  let cfg = createI18n(cat, "en")
+
+  let node = buildHtml(cfg):
+    el("div", class="app"):
+      el("h1"): t"hello"
+      el("p"): t"home"
+
+  let html = renderToHtml(node)
+  doAssert html.contains("<h1>Hello</h1>")
+  doAssert html.contains("<p>Home</p>")
+  echo "PASS: buildHtml i18n with cfg macro"
+
+proc testI18nBuildHtmlCallSyntax() =
+  let cat = newMessageCatalog("en", "en")
+  cat.addTranslation("en", "hello", "Hello")
+  cat.addTranslation("en", "greeting", "Hello {name}")
+  let cfg = createI18n(cat, "en")
+
+  let node = buildHtml:
+    el("div"):
+      el("h1"): t(cfg, "hello")
+      el("p"): tp(cfg, "greeting", proc(): InterpParams =
+        result = initTable[string, InterpValue]()
+        result["name"] = str("World")
+      )
+
+  let html = renderToHtml(node)
+  doAssert html.contains("<h1>Hello</h1>")
+  doAssert html.contains("<p>Hello World</p>")
+  echo "PASS: buildHtml i18n call syntax"
+
+proc testI18nRegisterCatalogMacro() =
+  registerI18nCatalog("../locales/app.json")
+  let cat = newMessageCatalog("en", "en")
+  cat.addTranslation("en", "hello", "Hello")
+  cat.addTranslation("en", "about", "About")
+  let cfg = createI18n(cat, "en")
+
+  let node = buildHtml(cfg):
+    el("div"):
+      el("h1"): t"hello"
+      el("p"): t"about"
+
+  let html = renderToHtml(node)
+  echo "HTML: ", html
+  doAssert html.contains("<h1>Hello</h1>")
+  doAssert html.contains("<p>About</p>")
+  echo "PASS: registerI18nCatalog macro"
+
+proc testForMacro() =
+  let items = @["Alice", "Bob", "Charlie"]
+  let node = buildHtml:
+    el("ul"):
+      for name in items:
+        el("li"): text(name)
+  let html = renderToHtml(node)
+  doAssert html.contains("<li>Alice</li>")
+  doAssert html.contains("<li>Bob</li>")
+  doAssert html.contains("<li>Charlie</li>")
+  echo "PASS: for macro"
+
+proc testForMacroNested() =
+  let items = @[("a", "A"), ("b", "B")]
+  let node = buildHtml:
+    el("dl"):
+      for (key, val) in items:
+        el("dt"): text(key)
+        el("dd"): text(val)
+  let html = renderToHtml(node)
+  doAssert html.contains("<dt>a</dt>")
+  doAssert html.contains("<dd>A</dd>")
+  doAssert html.contains("<dt>b</dt>")
+  doAssert html.contains("<dd>B</dd>")
+  echo "PASS: for macro nested"
+
 when isMainModule:
   testTextNode()
   testElementNode()
@@ -122,5 +205,10 @@ when isMainModule:
   testElMacro()
   testReactiveAttrMacro()
   testConditionalMacro()
+  testI18nBuildHtmlWithCfgMacro()
+  testI18nBuildHtmlCallSyntax()
+  testI18nRegisterCatalogMacro()
+  testForMacro()
+  testForMacroNested()
   echo ""
   echo "All HTML DSL tests passed!"

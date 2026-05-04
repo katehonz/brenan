@@ -275,6 +275,32 @@ proc testResourceLoadingState() =
   doAssert res.state() == rsReady
   echo "PASS: resource loading state"
 
+proc testResourceCancellation() =
+  ## Test that rapid refetches only apply the latest result.
+  ## With sync fetcher this is less critical, but the protection logic
+  ## should still work correctly.
+  var fetchCount = 0
+  let res = createResource(proc(): int =
+    inc fetchCount
+    fetchCount
+  )
+
+  doAssert res.value() == 1
+  doAssert res.lastCompletedFetchId == 1
+
+  res.refetch()
+  doAssert res.value() == 2
+  doAssert res.lastCompletedFetchId == 2
+
+  res.refetch()
+  res.refetch()
+  res.refetch()
+  # All sync, so each completes before the next starts
+  doAssert res.value() == 5
+  doAssert res.lastCompletedFetchId == 5
+  doAssert res.pendingFetchId == 5
+  echo "PASS: resource cancellation / race protection"
+
 # ========== Main ==========
 
 when isMainModule:
@@ -301,6 +327,7 @@ when isMainModule:
   testResourceWithSource()
   testResourceReactivity()
   testResourceLoadingState()
+  testResourceCancellation()
 
   echo ""
   echo "All reactive extension tests passed!"

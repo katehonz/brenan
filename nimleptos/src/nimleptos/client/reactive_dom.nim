@@ -75,6 +75,35 @@ when defined(js):
           currentIsThen = cond
       )
       return wrapper
+    if node.listItems != nil:
+      let wrapper = createElement("div")
+      wrapper.style.setProperty("display", "contents")
+      var currentEls: seq[DomElement] = @[]
+
+      proc renderList() =
+        let items = node.listItems()
+        var newEls: seq[DomElement] = @[]
+
+        for item in items:
+          let el = renderDomNode(item)
+          newEls.add(el)
+
+        # Remove old elements
+        for el in currentEls:
+          if el.parentNode == wrapper:
+            wrapper.removeChild(el)
+
+        # Add new elements
+        for el in newEls:
+          wrapper.appendChild(el)
+
+        currentEls = newEls
+
+      renderList()
+      discard createEffect(proc() =
+        renderList()
+      )
+      return wrapper
     result = createElement(node.tag)
     for (key, value) in node.attributes:
       result.setAttribute(key, value)
@@ -127,15 +156,6 @@ else:
     discard
 
   proc reactiveTextNode*(getter: Getter[string]): DomElement =
-    discard
-
-  proc reactiveAttr*(el: DomElement, name: string, getter: Getter[string]) =
-    discard
-
-  proc reactiveClass*(el: DomElement, getter: Getter[string]) =
-    discard
-
-  proc reactiveStyle*(el: DomElement, prop: string, getter: Getter[string]) =
     discard
 
   proc clearChildren*(el: DomElement) =

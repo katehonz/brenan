@@ -1,6 +1,7 @@
 import std/json
 import std/tables
-import std/os
+when not defined(js):
+  import std/os
 
 type
   MessageKey* = string
@@ -45,25 +46,26 @@ proc getMessage*(cat: MessageCatalog, locale: LocaleStr, key: MessageKey): strin
     return cat.messages[fb][key]
   return key
 
-proc loadCatalog*(filePath: string): MessageCatalog =
-  result = emptyCatalog()
-  if not fileExists(filePath):
-    return
-  let jsonNode = parseFile(filePath)
-  if jsonNode.kind != JObject:
-    return
-  result.defaultLocale = jsonNode{"defaultLocale"}.getStr("en")
-  result.fallbackLocale = jsonNode{"fallbackLocale"}.getStr(result.defaultLocale)
-  let messagesNode = jsonNode{"messages"}
-  if messagesNode.kind != JObject:
-    return
-  for localeKey, localeMsgs in messagesNode.pairs():
-    if localeMsgs.kind != JObject:
-      continue
-    var tbl = initTable[MessageKey, string]()
-    for msgKey, msgVal in localeMsgs.pairs():
-      tbl[$msgKey] = msgVal.getStr($msgKey)
-    result.messages[localeKey] = tbl
+when not defined(js):
+  proc loadCatalog*(filePath: string): MessageCatalog =
+    result = emptyCatalog()
+    if not fileExists(filePath):
+      return
+    let jsonNode = parseFile(filePath)
+    if jsonNode.kind != JObject:
+      return
+    result.defaultLocale = jsonNode{"defaultLocale"}.getStr("en")
+    result.fallbackLocale = jsonNode{"fallbackLocale"}.getStr(result.defaultLocale)
+    let messagesNode = jsonNode{"messages"}
+    if messagesNode.kind != JObject:
+      return
+    for localeKey, localeMsgs in messagesNode.pairs():
+      if localeMsgs.kind != JObject:
+        continue
+      var tbl = initTable[MessageKey, string]()
+      for msgKey, msgVal in localeMsgs.pairs():
+        tbl[$msgKey] = msgVal.getStr($msgKey)
+      result.messages[localeKey] = tbl
 
 proc mergeCatalogs*(a, b: MessageCatalog): MessageCatalog =
   result = emptyCatalog()

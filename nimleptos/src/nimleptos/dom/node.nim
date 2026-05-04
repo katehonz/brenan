@@ -24,6 +24,7 @@ type
     condition*: proc(): bool {.closure, gcsafe.}  ## For conditional nodes (if/else)
     thenBranch*: HtmlNode  ## Shown when condition is true
     elseBranch*: HtmlNode  ## Shown when condition is false
+    listItems*: proc(): seq[HtmlNode] {.closure, gcsafe.}  ## For list rendering (For macro)
     domEventHandlers*: seq[(string, DomEventHandler)]  ## Event handlers for CSR
 
 proc escapeHtml*(s: string): string =
@@ -60,6 +61,12 @@ proc conditionalNode*(condition: proc(): bool {.closure, gcsafe.}, thenBranch, e
   result.thenBranch = thenBranch
   result.elseBranch = elseBranch
 
+proc listNode*(itemsGetter: proc(): seq[HtmlNode] {.closure, gcsafe.}): HtmlNode =
+  ## Create a list node that renders a dynamic sequence of HtmlNodes.
+  ## Used by the buildHtml macro for reactive for/list control flow.
+  result = elementNode("list")
+  result.listItems = itemsGetter
+
 proc addEvent*(node: HtmlNode, event: string, handlerId: string) =
   node.events.add((event, handlerId))
 
@@ -77,6 +84,10 @@ proc renderToHtml*(node: HtmlNode): string =
       return renderToHtml(node.thenBranch)
     else:
       return renderToHtml(node.elseBranch)
+  if node.listItems != nil:
+    for child in node.listItems():
+      result &= renderToHtml(child)
+    return
 
   result = "<" & node.tag
   for (key, value) in node.attributes:
@@ -96,6 +107,10 @@ proc renderToHtmlRaw*(node: HtmlNode): string =
       return renderToHtmlRaw(node.thenBranch)
     else:
       return renderToHtmlRaw(node.elseBranch)
+  if node.listItems != nil:
+    for child in node.listItems():
+      result &= renderToHtmlRaw(child)
+    return
 
   result = "<" & node.tag
   for (key, value) in node.attributes:

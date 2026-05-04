@@ -45,13 +45,13 @@ proc localeMiddleware*(config: LocaleDetectionConfig): HandlerAsync =
     var detectedLocale = ""
 
     if config.detectFromUrl:
-      let path = ctx.path
+      let path = ctx.request.url.path
       let fromUrl = extractLocaleFromUrl(path, config.supportedLocales)
       if fromUrl.len > 0:
         detectedLocale = fromUrl
 
     if detectedLocale.len == 0 and config.detectFromCookie:
-      let rawCookies = ctx.getHeader("Cookie")
+      let rawCookies = ctx.request.headers.getHeader("Cookie")
       if rawCookies.len > 0:
         for cookie in rawCookies.split(';'):
           let parts = cookie.strip().split('=')
@@ -61,7 +61,7 @@ proc localeMiddleware*(config: LocaleDetectionConfig): HandlerAsync =
               detectedLocale = cookieLocale
 
     if detectedLocale.len == 0 and config.detectFromHeader:
-      let acceptLang = ctx.getHeader("Accept-Language")
+      let acceptLang = ctx.request.headers.getHeader("Accept-Language")
       if acceptLang.len > 0:
         let fromHeader = extractLocaleFromAccept(acceptLang, config.supportedLocales)
         if fromHeader.len > 0:

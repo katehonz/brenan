@@ -112,6 +112,13 @@ task hot, "Watch src/ and recompile JS client on changes (short alias for hotCli
   exec "nim c --threads:on -p:src tools/hotreload.nim"
   exec "tools/hotreload \"nim js -p:src -o:examples/counter_client.js examples/counter_client.nim\" src examples"
 
+task i18nClient, "Compile i18n client-side JS":
+  exec "nim js -p:src -o:examples/i18n_client.js examples/i18n_client.nim"
+
+task i18n, "Build and run i18n demo app (SSR + client-side)":
+  exec "nim js -p:src -o:examples/i18n_client.js examples/i18n_client.nim"
+  exec "nim c -r --threads:on -p:src examples/i18n_app.nim"
+
 task cleanWasm, "Clean WASM build artifacts":
   exec "rm -rf examples/nimbling_reactive/nimcache examples/nimbling_counter/nimcache"
   exec "rm -f examples/nimbling_reactive/*.nbg examples/nimbling_counter/*.nbg"
