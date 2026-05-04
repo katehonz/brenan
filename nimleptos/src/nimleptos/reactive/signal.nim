@@ -46,3 +46,21 @@ proc createSignalTriple*[T](initial: T): SignalTriple[T] =
       notify(sig)
 
   return (sig, getter, setter)
+
+## ─── Trigger — imperative reactive invalidation ───
+
+type Trigger* = tuple[track: proc() {.closure.}, notify: proc() {.closure.}]
+
+proc createTrigger*(): Trigger =
+  ## Returns a trigger pair: `track()` to subscribe in an effect,
+  ## `notify()` to invalidate all subscribers imperatively.
+  let sig = newSignal[int](0)
+
+  proc track() =
+    addDependency(sig)
+
+  proc notifyFn() =
+    sig.value = sig.value + 1
+    notify(sig)
+
+  return (track: track, notify: notifyFn)

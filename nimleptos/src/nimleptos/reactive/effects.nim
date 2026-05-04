@@ -1,12 +1,22 @@
 import subscriber
 import signal
+import owner
 
 export subscriber
 export signal
+export owner
 
 proc createEffect*(effect: proc() {.closure.}): Computation =
   let comp = Computation(execute: effect)
   trackDependencies(comp)
+
+  # Register cleanup in owner scope so subscriptions are released on dispose
+  let ownerCtx = getCurrentOwner()
+  if ownerCtx != nil:
+    ownerCtx.addDisposer(proc() =
+      cleanup(comp)
+    )
+
   return comp
 
 type
@@ -42,5 +52,12 @@ proc createMemo*[T](compute: proc(): T {.closure.}): MemoPair[T] =
   )
 
   trackDependencies(comp)
+
+  # Register cleanup in owner scope
+  let ownerCtx = getCurrentOwner()
+  if ownerCtx != nil:
+    ownerCtx.addDisposer(proc() =
+      cleanup(comp)
+    )
 
   return (getter, comp)
