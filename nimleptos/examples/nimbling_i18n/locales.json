@@ -1,0 +1,27 @@
+{
+  "defaultLocale": "en",
+  "fallbackLocale": "en",
+  "messages": {
+    "en": {
+      "hello": "Hello",
+      "world": "World",
+      "greeting": "Hello, {name}!",
+      "items": "{count} items",
+      "switch_lang": "Switch Language"
+    },
+    "bg": {
+      "hello": "Здравей",
+      "world": "Свят",
+      "greeting": "Здравей, {name}!",
+      "items": "{count} елемента",
+      "switch_lang": "Смени езика"
+    },
+    "fr": {
+      "hello": "Bonjour",
+      "world": "Monde",
+      "greeting": "Bonjour, {name}!",
+      "items": "{count} éléments",
+      "switch_lang": "Changer de langue"
+    }
+  }
+}

@@ -70,11 +70,17 @@ jobs:
       - name: Install dependencies
         run: nimble install -d --accept
 
-      - name: Check WASM compilation (compileOnly, native C target)
+      - name: Check WASM compilation — reactive counter
         run: |
           nim c --cc:clang --cpu:wasm32 --os:standalone --mm:orc -d:wasm32 \
             -p:src --compileOnly --nimcache:examples/nimbling_reactive/nimcache \
             examples/nimbling_reactive/counter.nim
+
+      - name: Check WASM compilation — i18n bridge
+        run: |
+          nim c --cc:clang --cpu:wasm32 --os:standalone --mm:orc -d:wasm32 \
+            -p:src --compileOnly --nimcache:examples/nimbling_i18n/nimcache \
+            examples/nimbling_i18n/i18n.nim
 
   benchmark:
     name: Benchmarks

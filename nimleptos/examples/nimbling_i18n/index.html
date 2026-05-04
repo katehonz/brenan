@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NimLeptos + Nimbling i18n</title>
+  <style>
+    body { font-family: sans-serif; padding: 40px; max-width: 600px; margin: 0 auto; }
+    h1 { color: #333; }
+    .locale-bar { margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 8px; }
+    .locale-bar label { font-weight: bold; margin-right: 10px; }
+    .locale-bar button { font-size: 16px; padding: 8px 16px; margin: 0 4px; cursor: pointer; }
+    .locale-bar button.active { background: #4a90d9; color: white; border-color: #4a90d9; }
+    .demo { margin: 30px 0; }
+    .demo h2 { color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
+    .demo p { margin: 12px 0; font-size: 18px; }
+    .demo .params { font-size: 14px; color: #888; }
+    .info { margin-top: 30px; padding: 15px; background: #f0f8ff; border-radius: 8px; }
+    .info code { background: #e0e0e0; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>🦎 NimLeptos + Nimbling i18n</h1>
+  <p>Internationalization running in WASM via nimbling</p>
+
+  <div class="locale-bar">
+    <label data-i18n-key="switch_lang">Switch Language</label>
+    <button id="btn-en" class="active" onclick="setLocale('en')">English</button>
+    <button id="btn-bg" onclick="setLocale('bg')">Български</button>
+    <button id="btn-fr" onclick="setLocale('fr')">Français</button>
+    <span style="margin-left: 15px; color: #666;">Current: <code id="current-locale">en</code></span>
+  </div>
+
+  <div class="demo">
+    <h2>Simple Translations</h2>
+    <p><span data-i18n-key="hello">Hello</span>, <span data-i18n-key="world">World</span>!</p>
+
+    <h2>Interpolated Translations</h2>
+    <p data-i18n-key="greeting" data-i18n-params="name|WASM">Hello, WASM!</p>
+    <p data-i18n-key="items" data-i18n-params="count|42">42 items</p>
+    <p class="params">(Params updated via JS every 3 seconds)</p>
+  </div>
+
+  <div class="info">
+    <p><strong>How it works:</strong></p>
+    <ul>
+      <li>JSON catalog is loaded by JS and passed to WASM via <code>addTranslation()</code> calls</li>
+      <li>All elements with <code>data-i18n-key</code> are registered for auto-update</li>
+      <li>Clicking a locale button calls <code>wasm.setLocale()</code></li>
+      <li>WASM notifies JS via <code>registerOnLocaleChange</code> callback</li>
+      <li>JS updates DOM text nodes with <code>wasm.translate()</code> / <code>wasm.translateWithParams()</code></li>
+    </ul>
+  </div>
+
+  <!-- Load the nimbling-generated JS glue -->
+  <script type="module">
+    import initWasm from './pkg/i18n.js';
+
+    let wasm;
+
+    // The message catalog (normally loaded from locales.json)
+    const catalog = {
+      defaultLocale: 'en',
+      fallbackLocale: 'en',
+      messages: {
+        en: {
+          hello: 'Hello',
+          world: 'World',
+          greeting: 'Hello, {name}!',
+          items: '{count} items',
+          switch_lang: 'Switch Language'
+        },
+        bg: {
+          hello: 'Здравей',
+          world: 'Свят',
+          greeting: 'Здравей, {name}!',
+          items: '{count} елемента',
+          switch_lang: 'Смени езика'
+        },
+        fr: {
+          hello: 'Bonjour',
+          world: 'Monde',
+          greeting: 'Bonjour, {name}!',
+          items: '{count} éléments',
+          switch_lang: 'Changer de langue'
+        }
+      }
+    };
+
+    // Update all elements with data-i18n-key attribute
+    function updateI18n() {
+      document.querySelectorAll('[data-i18n-key]').forEach(el => {
+        const key = el.getAttribute('data-i18n-key');
+        const params = el.getAttribute('data-i18n-params');
+        if (params) {
+          el.textContent = wasm.translateWithParams(key, params);
+        } else {
+          el.textContent = wasm.translate(key);
+        }
+      });
+      document.getElementById('current-locale').textContent = wasm.getLocale();
+
+      // Update active button state
+      const current = wasm.getLocale();
+      document.querySelectorAll('.locale-bar button').forEach(btn => {
+        btn.classList.toggle('active', btn.id === 'btn-' + current);
+      });
+    }
+
+    // Make setLocale available globally for onclick handlers
+    window.setLocale = function(locale) {
+      wasm.setLocale(locale);
+      // updateI18n is also called via the registered callback
+    };
+
+    async function main() {
+      wasm = await initWasm();
+
+      // Initialize i18n catalog
+      wasm.initI18n(catalog.defaultLocale, catalog.fallbackLocale);
+      for (const [locale, msgs] of Object.entries(catalog.messages)) {
+        for (const [key, msg] of Object.entries(msgs)) {
+          wasm.addTranslation(locale, key, msg);
+        }
+      }
+
+      // Register locale change callback
+      wasm.registerOnLocaleChange(() => {
+        updateI18n();
+      });
+
+      // Initial render
+      updateI18n();
+
+      // Periodically update the dynamic params demo
+      setInterval(() => {
+        const count = Math.floor(Date.now() / 1000) % 100;
+        const greetingEl = document.querySelector('[data-i18n-key="greeting"]');
+        if (greetingEl) {
+          greetingEl.setAttribute('data-i18n-params', 'name|WASM');
+        }
+        const itemsEl = document.querySelector('[data-i18n-key="items"]');
+        if (itemsEl) {
+          itemsEl.setAttribute('data-i18n-params', 'count|' + count);
+        }
+        updateI18n();
+      }, 3000);
+    }
+
+    main().catch(console.error);
+  </script>
+</body>
+</html>

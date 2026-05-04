@@ -1,6 +1,6 @@
 import std/json
 import std/tables
-when not defined(js):
+when not defined(js) and not defined(wasm32):
   import std/os
 
 type
@@ -46,7 +46,7 @@ proc getMessage*(cat: MessageCatalog, locale: LocaleStr, key: MessageKey): strin
     return cat.messages[fb][key]
   return key
 
-when not defined(js):
+when not defined(js) and not defined(wasm32):
   proc loadCatalog*(filePath: string): MessageCatalog =
     result = emptyCatalog()
     if not fileExists(filePath):
