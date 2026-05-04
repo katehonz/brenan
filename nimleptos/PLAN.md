@@ -7,8 +7,12 @@ Phase 11 добави WebAssembly компилация на reactive core с JS 
 Phase 11.1 оправи 3 критични бъга + 7 средни приоритета + добави 19 нови HTML елемента.
 Phase 12 добави Context, Store и Resource reactive примитиви.
 Phase 13 преработи WASM поддръжката за чисто Nimbling (без Emscripten) — reactive core се експортира чрез wasmBindgen, DOM е от JS страна.
+Phase 13.2: Fixed P0.1 createMemo closure bug — refactored `var cachedValue` to `ref MemoCache[T]` for WASM compatibility.
+Phase 13.3: Debug logging module added (`src/nimleptos/debuglog.nim`) — safe console.log for JS, echo for native, all gated by `-d:nimleptosDebug`.
+Phase 14: Performance benchmarks created — signal throughput, DOM render, SSR render in `benchmarks/`.
+Phase 15.4: CI/CD pipeline created — GitHub Actions workflow (`.github/workflows/ci.yml`) for native tests, client JS tests, WASM compile check, and benchmarks.
 
-Всички фази са реализирани и тестовете минават (58 теста, 6 suite-а).
+Всички фази са реализирани и тестовете минават (69 теста, 7 suite-а).
 
 ---
 

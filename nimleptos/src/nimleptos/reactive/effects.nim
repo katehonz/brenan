@@ -11,10 +11,12 @@ proc createEffect*(effect: proc() {.closure.}): Computation =
 
 type
   MemoPair*[T] = tuple[getter: Getter[T], computation: Computation]
+  MemoCache[T] = ref object
+    value: T
 
 proc createMemo*[T](compute: proc(): T {.closure.}): MemoPair[T] =
   let memo = Memo[T](compute: compute, dirty: true)
-  var cachedValue: T
+  let cache = MemoCache[T](value: default(T))
 
   proc getter(): T =
     addDependency(memo)
@@ -23,18 +25,18 @@ proc createMemo*[T](compute: proc(): T {.closure.}): MemoPair[T] =
       # The memo's own computation (comp) already tracks these dependencies.
       let prev = getCurrentComputation()
       setCurrentComputation(nil)
-      cachedValue = memo.compute()
+      cache.value = memo.compute()
       setCurrentComputation(prev)
-      memo.value = cachedValue
+      memo.value = cache.value
       memo.dirty = false
-    return cachedValue
+    return cache.value
 
   let comp = Computation(
     execute: proc() =
       let newVal = memo.compute()
-      if cachedValue != newVal:
-        cachedValue = newVal
-        memo.value = cachedValue
+      if cache.value != newVal:
+        cache.value = newVal
+        memo.value = cache.value
         memo.dirty = false
         notify(memo)
   )

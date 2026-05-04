@@ -37,9 +37,12 @@ when defined(js):
   proc getTextContent*(el: DomElement): string =
     $el.textContent
 
+  proc stdAddEventListener(el: DomElement, event: cstring,
+      handler: proc(e: Event) {.closure.}) {.importcpp: "addEventListener".}
+
   proc addEventListener*(el: DomElement, event: string,
       handler: proc(e: Event) {.closure.}) =
-    el.addEventListener(event, handler)
+    stdAddEventListener(el, cstring(event), handler)
 
   proc createElement*(tag: string): DomElement =
     document.createElement(cstring(tag))

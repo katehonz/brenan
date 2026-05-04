@@ -1,0 +1,100 @@
+name: NimLeptos CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-native:
+    name: Native Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.2.x'
+
+      - name: Install dependencies
+        run: nimble install -d --accept
+
+      - name: Run native tests
+        run: nimble test
+
+  test-client:
+    name: Client JS Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.2.x'
+
+      - name: Install dependencies
+        run: nimble install -d --accept
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install jsdom
+        run: npm install
+
+      - name: Compile client DOM test
+        run: nim js -p:src tests/client_dom_test.nim
+
+      - name: Run client DOM test
+        run: node --require ./tests/jsdom_setup.js tests/client_dom_test.js
+
+  test-wasm-compile:
+    name: WASM Compile Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.2.x'
+
+      - name: Install dependencies
+        run: nimble install -d --accept
+
+      - name: Check WASM compilation (compileOnly, native C target)
+        run: |
+          nim c --cc:clang --cpu:wasm32 --os:standalone --mm:orc -d:wasm32 \
+            -p:src --compileOnly --nimcache:examples/nimbling_reactive/nimcache \
+            examples/nimbling_reactive/counter.nim
+
+  benchmark:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.2.x'
+
+      - name: Install dependencies
+        run: nimble install -d --accept
+
+      - name: Run signal benchmark
+        run: nim c -r --threads:on -p:src benchmarks/signal_bench.nim
+
+      - name: Run DOM render benchmark
+        run: nim c -r --threads:on -p:src benchmarks/dom_render_bench.nim
+
+      - name: Run SSR render benchmark
+        run: nim c -r --threads:on -p:src benchmarks/ssr_render_bench.nim

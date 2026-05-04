@@ -20,6 +20,8 @@ task test, "Run all tests":
   exec "nim c -r --threads:on -p:src tests/server_test.nim"
   exec "nim c -r --threads:on -p:src tests/reactive_ext_test.nim"
   exec "nim c -r --threads:on -p:src tests/all_test.nim"
+  exec "nim js -p:src tests/client_dom_test.nim"
+  exec "node --require ./tests/jsdom_setup.js tests/client_dom_test.js"
 
 task example, "Run counter example":
   exec "nim c -r --threads:on -p:src examples/counter/main.nim"
@@ -109,3 +111,20 @@ task nimblingReactive, "Compile reactive core example for nimbling WASM":
   echo "     nimbling counter.wasm --out-dir pkg/ --target bundler"
   echo ""
   echo "  3. Open examples/nimbling_reactive/index.html in a browser"
+
+task bench, "Run all benchmarks":
+  exec "nim c -r --threads:on -p:src benchmarks/signal_bench.nim"
+  exec "nim c -r --threads:on -p:src benchmarks/dom_render_bench.nim"
+  exec "nim c -r --threads:on -p:src benchmarks/ssr_render_bench.nim"
+
+task benchSignal, "Run signal update throughput benchmark":
+  exec "nim c -r --threads:on -p:src benchmarks/signal_bench.nim"
+
+task benchDom, "Run DOM render benchmark":
+  exec "nim c -r --threads:on -p:src benchmarks/dom_render_bench.nim"
+
+task benchSsr, "Run SSR render benchmark":
+  exec "nim c -r --threads:on -p:src benchmarks/ssr_render_bench.nim"
+
+task cleanWasm, "Clean WASM build artifacts":
+  exec "rm -rf examples/nimbling_reactive/nimcache examples/nimbling_counter/nimcache"

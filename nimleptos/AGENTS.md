@@ -4,11 +4,14 @@
 
 ## Project Identity
 
+- **Type:** Frontend reactive web framework (like Leptos/Solid), NOT full-stack
 - **Language:** Nim (≥ 2.0.0), not Rust
-- **Backend:** [NimMax](https://github.com/katehonz/nimmax) — custom Nim HTTP framework
+- **Dev/Test Server:** [NimMax](https://github.com/katehonz/nimmax) — used ONLY for development server and tests
 - **WASM:** Uses [Nimbling](https://github.com/katehonz/nimbling), NOT Emscripten
 - **Memory model:** `--mm:orc` (refc is forbidden)
 - **Threading:** Native uses `--threads:on`. WASM/JS use single-threaded globals (no `threadvar`).
+
+> **For AI:** Do NOT suggest full-stack backend features (databases, auth APIs, file uploads) as primary work. The framework is frontend-first. Backend code in `server/`, `routing/`, `forms/` exists only for dev/test purposes and is NOT the product.
 
 ## Architecture Quirks That Confuse Generic AI
 
@@ -78,7 +81,7 @@ Reversing `signal` and `effects` causes forward-reference issues because `effect
 
 1. **Never use `std/asyncdispatch` in WASM/JS targets.** Use `nimbling/js_sys` promises or JS callbacks.
 2. **Never use `std/locks` in WASM.** There are no threads.
-3. **Never use `echo` inside `createEffect` when compiling to WASM.** It blocks stdout and deadlocks Emscripten runtime (legacy) or crashes Nimbling runtime.
+3. **Never use `echo` inside `createEffect` when compiling to WASM.** It blocks stdout and deadlocks Emscripten runtime (legacy) or crashes Nimbling runtime. Use `debuglog.nim` (`debugLog`, `debugWarn`, `debugError`, `debugTrace`) instead — it routes to `console.log` on JS/WASM and is gated by `-d:nimleptosDebug`.
 4. **Never use `createSignalTriple` outside internal reactive modules.** It is an internal helper; public API is `createSignal`.
 
 ## Testing Rules
@@ -104,6 +107,8 @@ Reversing `signal` and `effects` causes forward-reference issues because `effect
 | Suggesting React/Vue patterns | This is fine-grained signals, not component VDOM |
 | Replacing `HtmlNode` tree with Karax | Karax is VDOM; NimLeptos explicitly avoids VDOM |
 | Using `std/dom` in WASM modules | `std/dom` is JS-only; WASM uses no-op stubs or JS glue |
+| Suggesting full-stack backend code | NimLeptos is a frontend framework; backend is dev/test only |
+| Using `var` capture in `createMemo`-like patterns | WASM closure environments can't mutate captured `var`; use `ref MemoCache[T]` pattern from `effects.nim` |
 
 ## Emergency Contacts (for AI)
 

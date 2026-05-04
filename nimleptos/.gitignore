@@ -63,3 +63,11 @@ src/nimleptos/wasm/dom_bridge
 src/nimleptos/wasm/reactive_wasm
 src/nimleptos/wasm/render
 tests/*_test.js
+
+# Node.js dependencies (jsdom for client DOM tests)
+node_modules/
+
+# Benchmark build artifacts
+benchmarks/signal_bench
+benchmarks/dom_render_bench
+benchmarks/ssr_render_bench
