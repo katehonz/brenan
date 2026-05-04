@@ -29,7 +29,21 @@ proc renderSlot*(children: ComponentChildren, placeholder: HtmlNode = nil): Html
 macro view*(callNode: untyped, body: untyped = nil): untyped =
   ## Call a component with props and optional child content.
   ## Children are wrapped in `buildHtml` automatically.
-  result = copyNimTree(callNode)
-  if body != nil and body.kind != nnkEmpty:
-    let childrenExpr = newCall("@", newCall("buildHtml", body))
-    result.add(newNimNode(nnkExprEqExpr).add(ident("children")).add(childrenExpr))
+  ##
+  ## Usage:
+  ##   view MyComponent(title="Hello", count=42):
+  ##     el("p"): text("child content")
+  ##
+  ## The component must accept a `children: ComponentChildren` parameter.
+  if callNode.kind == nnkCommand or callNode.kind == nnkCall:
+    result = copyNimTree(callNode)
+    if body != nil and body.kind != nnkEmpty:
+      let childrenExpr = newCall("@", newCall("buildHtml", body))
+      result.add(newNimNode(nnkExprEqExpr).add(ident("children")).add(childrenExpr))
+  elif callNode.kind == nnkIdent:
+    result = copyNimTree(callNode)
+    if body != nil and body.kind != nnkEmpty:
+      let childrenExpr = newCall("@", newCall("buildHtml", body))
+      result = newCall(callNode, newNimNode(nnkExprEqExpr).add(ident("children")).add(childrenExpr))
+  else:
+    error("view requires a component call expression, e.g. view MyComponent(props): ...", callNode)

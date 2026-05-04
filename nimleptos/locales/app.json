@@ -1,0 +1,39 @@
+{
+  "defaultLocale": "en",
+  "fallbackLocale": "en",
+  "messages": {
+    "en": {
+      "hello": "Hello",
+      "greeting": "Hello {name}",
+      "items_count": "one#1 item|other#{count} items",
+      "language": "Language",
+      "home": "Home",
+      "about": "About",
+      "contact": "Contact",
+      "click_me": "Click me",
+      "count": "Count: {value}"
+    },
+    "bg": {
+      "hello": "Здравей",
+      "greeting": "Здравей, {name}",
+      "items_count": "one#1 артикул|other#{count} артикула",
+      "language": "Език",
+      "home": "Начало",
+      "about": "За нас",
+      "contact": "Контакти",
+      "click_me": "Кликни",
+      "count": "Брой: {value}"
+    },
+    "fr": {
+      "hello": "Bonjour",
+      "greeting": "Bonjour {name}",
+      "items_count": "one#1 article|other#{count} articles",
+      "language": "Langue",
+      "home": "Accueil",
+      "about": "À propos",
+      "contact": "Contact",
+      "click_me": "Cliquez-moi",
+      "count": "Compte: {value}"
+    }
+  }
+}

@@ -76,3 +76,6 @@ node_modules/
 benchmarks/signal_bench
 benchmarks/dom_render_bench
 benchmarks/ssr_render_bench
+
+# Dev tools binaries
+tools/hotreload

@@ -20,8 +20,11 @@ task test, "Run all tests":
   exec "nim c -r --threads:on -p:src tests/server_test.nim"
   exec "nim c -r --threads:on -p:src tests/reactive_ext_test.nim"
   exec "nim c -r --threads:on -p:src tests/all_test.nim"
+  exec "nim c -r --threads:on -p:src tests/i18n_test.nim"
   exec "nim js -p:src tests/client_dom_test.nim"
   exec "node --require ./tests/jsdom_setup.js tests/client_dom_test.js"
+  exec "nim js -p:src tests/router_test.nim"
+  exec "node --require ./tests/jsdom_setup.js tests/router_test.js"
 
 task example, "Run counter example":
   exec "nim c -r --threads:on -p:src examples/counter/main.nim"
@@ -93,6 +96,21 @@ task benchDom, "Run DOM render benchmark":
 
 task benchSsr, "Run SSR render benchmark":
   exec "nim c -r --threads:on -p:src benchmarks/ssr_render_bench.nim"
+
+task hotClient, "Watch src/ and recompile JS client on changes (hot-reload)":
+  let watcher = "tools/hotreload"
+  # Compile watcher if not already built
+  if not fileExists(watcher):
+    exec "nim c --threads:on -p:src " & watcher & ".nim"
+  # Run watcher: watches src/ and recompiles counter_client.nim
+  # Usage: customize the watch dirs and compile command below
+  let watchDirs = "src examples"
+  let compileCmd = "nim js -p:src -o:examples/counter_client.js examples/counter_client.nim"
+  exec watcher & " \"" & compileCmd & "\" " & watchDirs
+
+task hot, "Watch src/ and recompile JS client on changes (short alias for hotClient)":
+  exec "nim c --threads:on -p:src tools/hotreload.nim"
+  exec "tools/hotreload \"nim js -p:src -o:examples/counter_client.js examples/counter_client.nim\" src examples"
 
 task cleanWasm, "Clean WASM build artifacts":
   exec "rm -rf examples/nimbling_reactive/nimcache examples/nimbling_counter/nimcache"

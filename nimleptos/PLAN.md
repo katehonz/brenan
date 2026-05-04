@@ -11,12 +11,33 @@ Phase 13.2: Fixed P0.1 createMemo closure bug — refactored `var cachedValue` t
 Phase 13.3: Debug logging module added (`src/nimleptos/debuglog.nim`) — safe console.log for JS, echo for native, all gated by `-d:nimleptosDebug`.
 Phase 14: Performance benchmarks created — signal throughput, DOM render, SSR render in `benchmarks/`.
 Phase 15.4: CI/CD pipeline created — GitHub Actions workflow (`.github/workflows/ci.yml`) for native tests, client JS tests, WASM compile check, and benchmarks.
+Phase 15.1: Better error messages in macros — `el` validates tag arg at compile time with line info, `copyLineInfo` propagation, `view` validates callNode shape.
+Phase 15.3: Hot-reload tool — `tools/hotreload.nim` file watcher with `nimble hot` command.
 
-Всички фази са реализирани и тестовете минават (69 теста, 7 suite-а).
+Phase 16: i18n core implemented — `src/nimleptos/i18n/` (5 модула: catalog, plural, interpolate, locale_middleware, i18n).
+  - MessageCatalog с JSON loading, mergeCatalogs, fallback locale
+  - ICU plural rules (EN, BG, RU, AR, FR, DE, ES, IT)
+  - Reactive translation: `t()`, `tp()`, `setLocale()`, `useLocale()`
+  - Interpolation с placeholder-и `{name}`
+  - Locale detection middleware (URL prefix, Cookie, Accept-Language)
+
+Router tests added: `tests/router_test.nim` — 10 tests (hash route, navigate, initHashRouter, routeParam edge cases).
+i18n tests added: `tests/i18n_test.nim` — 18 tests (catalog, plural, interpolate, reactive t(), setLocale/useLocale).
+
+Всички фази са реализирани и тестовете минават (97 теста, 9 suite-а).
 
 ---
 
 ## Реализирани модули (23 файла)
+
+### i18n (`src/nimleptos/i18n/`)
+| Файл | Описание |
+|------|----------|
+| `catalog.nim` | MessageCatalog, loadCatalog от JSON, mergeCatalogs |
+| `i18n.nim` | I18nConfig, createI18n, t(), tp(), setLocale, useLocale |
+| `plural.nim` | ICU plural rules (EN, BG, RU, AR, FR) + parsePluralMessage |
+| `interpolate.nim` | String interpolation с {placeholder} синтаксис |
+| `locale_middleware.nim` | NimMax middleware: Accept-Language/Cookie/URL locale detection |
 
 ### Reactive Core (`src/nimleptos/reactive/`)
 | Файл | Описание |
@@ -100,7 +121,10 @@ Phase 15.4: CI/CD pipeline created — GitHub Actions workflow (`.github/workflo
 | `tests/server_test.nim` | PASS — 9 tests |
 | `tests/reactive_ext_test.nim` | PASS — 18 tests |
 | `tests/all_test.nim` | PASS — 9 tests |
-| **Общо** | **58 теста, всички PASS** |
+| `tests/client_dom_test.nim` | PASS — 11 tests |
+| `tests/router_test.nim` | PASS — 10 tests |
+| `tests/i18n_test.nim` | PASS — 18 tests |
+| **Общо** | **97 теста, всички PASS** |
 
 ---
 
@@ -180,6 +204,7 @@ main()
 ```
 nimleptos/
 ├── src/nimleptos/
+│   ├── i18n/           # Internationalization (catalog, plural, reactive t())
 │   ├── reactive/        # Signal system + Context + Store + Resource
 │   ├── dom/             # HTML node tree (35 element builders)
 │   ├── macros/          # Compile-time DSL
@@ -188,8 +213,10 @@ nimleptos/
 │   ├── routing/         # Route components + layouts
 │   ├── forms/           # Form handling + validation
 │   ├── realtime/        # WebSocket signals
-│   └── client/          # JS hydration (nim js)
-├── tests/               # 6 test suites, 58 tests
+│   └── client/          # JS hydration + reactive DOM (nim js)
+├── tools/               # Dev tools (hotreload watcher)
+├── locales/             # i18n message catalog files (JSON)
+├── tests/               # 9 test suites, 97 tests
 ├── examples/            # 8 examples (SSR, CSR, hybrid, WASM, blog)
 ├── docs/                # 8 documentation files
 ├── nimleptos.nimble

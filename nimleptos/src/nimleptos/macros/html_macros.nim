@@ -23,13 +23,6 @@ proc buildTextNode(text: string): NimNode =
   newCall("textNode", newStrLitNode(text))
 
 proc buildReactiveTextNode(expr: NimNode): NimNode =
-  ## For non-string-literal text expressions, generate:
-  ##   when defined(js):
-  ##     reactiveTextNode($expr, proc(): string = $expr)
-  ##   else:
-  ##     textNode($expr)
-  ## Note: wasm32 uses static path due to Emscripten function table limits
-  ## with module-level signal closures.
   let strExpr = newCall("$", expr)
   let getterProc = newNimNode(nnkLambda)
   getterProc.add(newEmptyNode())
@@ -56,12 +49,6 @@ proc buildReactiveTextNode(expr: NimNode): NimNode =
   result.add(elseBranch)
 
 proc buildReactiveAttr(nodeVar: NimNode, name: string, expr: NimNode): NimNode =
-  ## Generate:
-  ##   when defined(js):
-  ##     addReactiveAttr(node, "name", proc(): string = $expr)
-  ##   else:
-  ##     addAttribute(node, "name", $expr)
-  ## Note: wasm32 uses static path due to Emscripten function table limits.
   let strExpr = newCall("$", expr)
   let getterProc = newNimNode(nnkLambda)
   getterProc.add(newEmptyNode())
@@ -191,7 +178,9 @@ proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)
       for a in nestedStaticAttrs: sAttrs.add(a)
       for a in nestedReactiveAttrs: rAttrs.add(a)
       for e in nestedEvents: evts.add(e)
-      result.children.add(buildElementCall(tagName, sAttrs, rAttrs, evts, nestedChildren))
+      let elNode = buildElementCall(tagName, sAttrs, rAttrs, evts, nestedChildren)
+      elNode.copyLineInfo(child)
+      result.children.add(elNode)
     of nnkIfStmt:
       let ifBranch = child[0]  # ElifBranch
       let conditionExpr = ifBranch[0]
@@ -231,7 +220,9 @@ proc extractAttrsAndBody(body: NimNode): tuple[staticAttrs: seq[(string, string)
       conditionProc.add(newEmptyNode())
       conditionProc.add(newStmtList(conditionExpr))
       
-      result.children.add(newCall("conditionalNode", conditionProc, thenNode, elseNode))
+      let condNode = newCall("conditionalNode", conditionProc, thenNode, elseNode)
+      condNode.copyLineInfo(child)
+      result.children.add(condNode)
     of nnkInfix, nnkPrefix:
       result.children.add(buildReactiveTextNode(child))
     of nnkIdent, nnkDotExpr, nnkBracketExpr, nnkPar, nnkCast, nnkObjConstr, nnkCurly, nnkLambda:
@@ -247,6 +238,7 @@ macro html*(body: untyped): untyped =
     result = buildElementCall("div", staticAttrs, reactiveAttrs, events, children)
   else:
     result = newCall("elementNode", newStrLitNode("div"))
+  result.copyLineInfo(body)
 
 macro buildHtml*(body: untyped): untyped =
   ## Build an HtmlNode tree from a DSL.
@@ -261,6 +253,7 @@ macro buildHtml*(body: untyped): untyped =
     result = buildElementCall("div", staticAttrs, reactiveAttrs, events, children)
   else:
     result = newCall("elementNode", newStrLitNode("div"))
+  result.copyLineInfo(body)
 
 macro el*(args: varargs[untyped]): untyped =
   ## Create an HTML element. First arg is tag name, rest are attrs or body.
@@ -271,8 +264,14 @@ macro el*(args: varargs[untyped]): untyped =
   ##     text("Hello")
   if args.len == 0:
     error("el macro requires at least a tag name")
-  let tag = $args[0]
+  let tagArg = args[0]
+  if tagArg.kind != nnkStrLit:
+    error("tag name must be a string literal, got: " & $tagArg.kind, tagArg)
+  let tag = $tagArg
+  if tag.len == 0:
+    error("tag name cannot be empty", tagArg)
   var body: NimNode = nil
   let (sAttrs, rAttrs, evts) = parseAttrs(args, 1, body)
   let (_, _, _, children) = extractAttrsAndBody(body)
   result = buildElementCall(tag, sAttrs, rAttrs, evts, children)
+  result.copyLineInfo(tagArg)
