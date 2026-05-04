@@ -1,13 +1,11 @@
 import nimmax
+import nimmax/middlewares/utils
 import ../src/nimleptos
 
 proc homePage(ctx: Context): Future[HtmlNode] {.gcsafe.} =
   result = newFuture[HtmlNode]()
   let (count, setCount) = createSignal(0)
-  var countText: string
-  discard createEffect(proc() =
-    countText = $count()
-  )
+  let countText = $count()
   let node = elDiv([("class", "home")],
     elH1([], text("NimLeptos + NimMax")),
     elP([], text("Count: " & countText)),
