@@ -15,6 +15,9 @@ cd nimleptos
 # Reactive counter with nimbling WASM
 nimble nimblingReactive
 
+# i18n bridge with nimbling WASM
+nimble nimblingI18n
+
 # Then link with WASI SDK and run nimbling CLI:
 cd examples/nimbling_reactive
 export WASI_SDK_PATH=/path/to/wasi-sdk
@@ -74,4 +77,37 @@ nimbling output.wasm --out-dir pkg/ --target bundler
 | Task | Command | Output |
 |------|---------|--------|
 | `nimblingReactive` | Reactive core via nimbling | `examples/nimbling_reactive/nimcache/` |
+| `nimblingI18n` | i18n bridge via nimbling | `examples/nimbling_i18n/nimcache/` |
 | `test` | Run all native tests | — |
+
+### WASM i18n Bridge
+
+The i18n module (`src/nimleptos/wasm/i18n_wasm.nim`) exports translation functions via `wasmBindgen`:
+
+```nim
+proc initI18n*(defaultLocale: string, fallbackLocale: string) {.wasmBindgen.}
+proc addTranslation*(locale: string, key: string, message: string) {.wasmBindgen.}
+proc setLocale*(locale: string) {.wasmBindgen.}
+proc getLocale*(): string {.wasmBindgen.}
+proc translate*(key: string): string {.wasmBindgen.}
+proc translateWithParams*(key: string, params: string): string {.wasmBindgen.}
+proc registerOnLocaleChange*(callback: Closure[void]) {.wasmBindgen.}
+```
+
+**JS usage:**
+```javascript
+import initWasm from './pkg/i18n.js';
+const wasm = await initWasm();
+
+wasm.initI18n('en', 'en');
+wasm.addTranslation('en', 'hello', 'Hello');
+wasm.addTranslation('bg', 'hello', 'Здравей');
+
+wasm.registerOnLocaleChange(() => {
+  document.getElementById('hello').textContent = wasm.translate('hello');
+});
+
+wasm.setLocale('bg');  // JS callback updates DOM
+```
+
+See `examples/nimbling_i18n/index.html` for a complete demo with locale switcher and interpolated translations.

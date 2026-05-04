@@ -25,6 +25,7 @@ A full-stack reactive web framework for Nim, inspired by [Leptos](https://leptos
 - **Context** — Dependency injection for reactive components (key/value provider/consumer)
 - **Store** — Global reactive state container with selectors and slices
 - **Resource** — Async reactive primitive with loading/error/value states and auto-refetch
+- **i18n / Localization** — Reactive translations with ICU pluralization, interpolation, SSR middleware, and WASM bridge
 
 ## Quick Start
 
@@ -243,6 +244,8 @@ app.post("/register", proc(ctx: Context) {.async.} =
 
 Compile the reactive core to WebAssembly for high-performance signal computation in the browser, controlled from JavaScript via [Nimbling](https://github.com/katehonz/nimbling):
 
+### Reactive Counter Example
+
 ```nim
 # examples/nimbling_reactive/counter.nim
 import nimbling
@@ -279,6 +282,38 @@ console.log(wasm.getDoubled());    // 2
 ```
 
 Open `examples/nimbling_reactive/index.html` in a browser to see the interactive demo.
+
+### WASM i18n Bridge
+
+Translate in WASM with locale change callbacks to JS:
+
+```nim
+# examples/nimbling_i18n/i18n.nim
+import nimleptos/wasm/i18n_wasm  # exports initI18n, setLocale, translate, etc.
+```
+
+```bash
+nimble nimblingI18n
+```
+
+```javascript
+import initWasm from './pkg/i18n.js';
+const wasm = await initWasm();
+
+wasm.initI18n('en', 'en');
+wasm.addTranslation('en', 'hello', 'Hello');
+wasm.addTranslation('bg', 'hello', 'Здравей');
+
+wasm.registerOnLocaleChange(() => {
+  document.querySelectorAll('[data-i18n-key]').forEach(el => {
+    el.textContent = wasm.translate(el.dataset.i18nKey);
+  });
+});
+
+wasm.setLocale('bg');  // DOM updates via JS callback
+```
+
+Open `examples/nimbling_i18n/index.html` for a full demo with locale switcher and interpolated translations.
 
 ### WASM Architecture
 
@@ -489,6 +524,7 @@ nimleptos/
 | [Client Hydration](docs/client.md) | JS compilation, event binding |
 | [WebSocket Realtime](docs/realtime.md) | Server signals, live updates |
 | [JWT Authentication](docs/auth.md) | Bearer tokens, login/refresh, role-based access |
+| [i18n & Localization](docs/i18n.md) | Reactive translations, ICU pluralization, SSR middleware, WASM bridge |
 | [Component System](docs/components.md) | View macros, slots, typed props |
 
 ## Testing

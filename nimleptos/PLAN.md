@@ -21,6 +21,7 @@ Phase 16: i18n core implemented — `src/nimleptos/i18n/` (5 модула: catal
   - Interpolation с placeholder-и `{name}`
   - Locale detection middleware (URL prefix, Cookie, Accept-Language)
   - **16.5 DONE:** `buildHtml(cfg)` i18n macro — `t"hello"`, `tp"hello"`, compile-time key validation via `registerI18nCatalog`
+  - **16.7 DONE:** WASM i18n bridge — `src/nimleptos/wasm/i18n_wasm.nim` exports `initI18n`, `setLocale`, `getLocale`, `translate`, `translateWithParams`, `registerOnLocaleChange` via `wasmBindgen`. JS side loads catalog via `addTranslation()` calls and drives DOM updates on locale change.
 
 Router tests added: `tests/router_test.nim` — 10 tests (hash route, navigate, initHashRouter, routeParam edge cases).
 i18n tests added: `tests/i18n_test.nim` — 18 tests (catalog, plural, interpolate, reactive t(), setLocale/useLocale).
@@ -29,6 +30,21 @@ Phase 17.1: Resource cancellation / race protection — `pendingFetchId` + `last
 Phase 17.2: `for` macro in `buildHtml` — `listNode` type, reactive list rendering in DOM, SSR support.
 
 Всички фази са реализирани и тестовете минават (107 теста, 9 suite-а).
+
+---
+
+## WASM i18n Bridge (`src/nimleptos/wasm/i18n_wasm.nim`)
+
+Exports i18n functionality via `wasmBindgen` for Nimbling workflow:
+- `initI18n(defaultLocale, fallbackLocale)` — initialize empty catalog
+- `addTranslation(locale, key, message)` — populate catalog from JS side
+- `setLocale(locale)` / `getLocale()` — locale switching with reactive signals
+- `translate(key)` / `translateWithParams(key, params)` — synchronous translation
+- `registerOnLocaleChange(callback)` / `unregisterOnLocaleChange(callback)` — JS callbacks on locale change
+- `getAvailableLocales()` / `getDefaultLocale()` / `getFallbackLocale()` — catalog introspection
+
+Example: `examples/nimbling_i18n/` — HTML/JS glue demo with locale switcher and interpolated translations.
+Build: `nimble nimblingI18n` (compile-only, requires Zig/WASI + nimbling CLI for full pipeline).
 
 ---
 

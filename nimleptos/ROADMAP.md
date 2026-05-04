@@ -26,7 +26,7 @@
 | Performance Benchmarks | ❌ Липсват | няма сравнение с Karax, HappyX, Solid |
 | CI/CD | ❌ Липсва | ръчно пускане на `nimble test` |
 | Developer Tools / Debug | ❌ Липсват | няма DevTools extension или debug utils |
-| i18n / Localization | ❌ Липсва | няма мулти-езикова поддръжка, нито на SSR нито на клиент |
+| i18n / Localization | ✅ Стабилен | reactive t() + SSR + WASM bridge, 18 теста |
 
 ---
 
@@ -131,10 +131,11 @@ src/nimleptos/i18n/
   - ✅ `parsePluralMessage(raw)` — parse-ва ICU plural string
 
 #### WASM част
-- [ ] **16.7** WASM i18n bridge
-  - Message catalog се зарежда от JS страна, предава се на WASM като `string` params
-  - `setLocale` и `t()` се export-ват през `wasmBindgen`
-  - DOM текстът се update-ва от JS glue при locale change
+- [x] **16.7** WASM i18n bridge
+  - ✅ `src/nimleptos/wasm/i18n_wasm.nim` — exports `initI18n`, `setLocale`, `getLocale`, `translate`, `translateWithParams`, `registerOnLocaleChange` via `wasmBindgen`
+  - ✅ JS side loads catalog via `addTranslation()` calls, registers `onLocaleChange` callback, drives DOM text updates
+  - ✅ `examples/nimbling_i18n/` — full HTML/JS glue demo with locale switcher
+  - ✅ Compile-only check passes in CI (`nimble nimblingI18n`)
 
 #### Интеграция
 - [x] **16.8** `examples/i18n_app.nim`
@@ -278,7 +279,7 @@ nimble nimblingReactive             # WASM pipeline не чупи (compile-only)
 | Документация страници | 8 | 12 | 15 |
 | WASM pipeline | compileOnly ✅ | пълен e2e | production-ready |
 | CI/CD | GitHub Actions ✅ | multi-platform | auto-release |
-| i18n поддръжка | reactive t() + SSR ✅ | 18 теста | пълен (WASM + macro) |
+| i18n поддръжка | reactive t() + SSR + WASM ✅ | 18 теста | пълен (macro + SSR + client + WASM) |
 | Benchmarks | created ✅ | 3 benchmark файла | +Karax сравнение |
 
 ---
@@ -298,6 +299,7 @@ nimble nimblingReactive             # WASM pipeline не чупи (compile-only)
 ---
 
 *Последна актуализация: 2026-05-04*
+*Phase 16.7 WASM i18n bridge — COMPLETED*
 *Версия: 0.2.0 → цел v0.3.0 (WASM стабилност + тестове + DX)*
 *i18n заложен във Фаза 16 за Q3 2026*
 *Client DOM тестове добавени: 11 теста, всички PASS*
