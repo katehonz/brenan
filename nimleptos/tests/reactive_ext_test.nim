@@ -301,6 +301,67 @@ proc testResourceCancellation() =
   doAssert res.pendingFetchId == 5
   echo "PASS: resource cancellation / race protection"
 
+# ========== Suspense Tests ==========
+
+import ../src/nimleptos/reactive/components
+import ../src/nimleptos/dom/node
+
+proc testSuspenseFallback() =
+  let loading = proc(): bool {.closure, gcsafe.} = true
+  let fallback = textNode("loading...")
+  let content = textNode("content")
+  let node = suspenseNode(loading, fallback, content)
+  # With loading=true, renderToHtml should show fallback
+  let html = renderToHtml(node)
+  doAssert html == "loading..."
+  echo "PASS: suspense shows fallback when loading"
+
+proc testSuspenseContent() =
+  let loading = proc(): bool {.closure, gcsafe.} = false
+  let fallback = textNode("loading...")
+  let content = textNode("ready")
+  let node = suspenseNode(loading, fallback, content)
+  let html = renderToHtml(node)
+  doAssert html == "ready"
+  echo "PASS: suspense shows content when not loading"
+
+proc testSuspenseWithResource() =
+  var fetchCount = 0
+  let res = createResource(proc(): string =
+    inc fetchCount
+    "User-" & $fetchCount
+  )
+  let fallback = textNode("please wait")
+  let content = textNode(res.value())
+  let node = suspenseNode(res, fallback, content)
+  let html = renderToHtml(node)
+  # Resource is sync, so loading was true briefly then false
+  doAssert html == "User-1"
+  echo "PASS: suspense with resource"
+
+# ========== Transition Tests ==========
+
+when defined(js):
+  proc testTransitionPassThrough() =
+    let (count, setCount) = createSignal(0)
+    let (tCount, tSetCount) = createTransition(count, setCount)
+    # Without delay, transition should eventually match source
+    doAssert tCount() == 0
+    tSetCount(5)
+    # Source is updated immediately
+    doAssert count() == 5
+    echo "PASS: transition sets source immediately"
+
+  proc testTransitionDelay() =
+    let (visible, setVisible) = createSignal(false)
+    let (tVisible, tSetVisible) = createTransition(visible, setVisible, 50)
+    doAssert tVisible() == false
+    tSetVisible(true)
+    doAssert visible() == true  # source updated immediately
+    # Transition value should still be false (not yet updated)
+    doAssert tVisible() == false
+    echo "PASS: transition defers update"
+
 # ========== Main ==========
 
 when isMainModule:
@@ -328,6 +389,16 @@ when isMainModule:
   testResourceReactivity()
   testResourceLoadingState()
   testResourceCancellation()
+
+  # Suspense
+  testSuspenseFallback()
+  testSuspenseContent()
+  testSuspenseWithResource()
+
+  # Transition (JS only)
+  when defined(js):
+    testTransitionPassThrough()
+    testTransitionDelay()
 
   echo ""
   echo "All reactive extension tests passed!"

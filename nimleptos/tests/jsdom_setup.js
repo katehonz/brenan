@@ -14,3 +14,14 @@ global.Event = dom.window.Event;
 global.Node = dom.window.Node;
 global.Element = dom.window.Element;
 global.HTMLElement = dom.window.HTMLElement;
+
+// Polyfill PopStateEvent for router tests (jsdom doesn't include it)
+if (!global.PopStateEvent) {
+  global.PopStateEvent = class PopStateEvent extends global.window.Event {
+    constructor(type, init) {
+      super(type, init);
+      this.state = init ? init.state : null;
+    }
+  };
+}
+global.window.PopStateEvent = global.PopStateEvent;

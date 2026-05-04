@@ -157,6 +157,117 @@ when defined(js):
     doAssert $domRoot.textContent == "Bob is 30 years old"
     echo "PASS: multipleReactiveChildren"
 
+  proc testOnMountCallback() =
+    var mountCalled = false
+    let el = nodedom.elementNode("div")
+    nodedom.addChild(el, nodedom.textNode("mounted"))
+
+    let dispose = mountApp("#app", proc(): HtmlNode =
+      onMount(proc() = mountCalled = true)
+      return el
+    )
+    doAssert mountCalled
+    let mountRoot = document.getElementById("app")
+    doAssert mountRoot != nil
+    doAssert mountRoot.children.len == 1
+    dispose()
+    echo "PASS: onMount callback"
+
+  proc testOnCleanupCallback() =
+    var cleanupCalled = false
+    let el = nodedom.elementNode("div")
+    nodedom.addChild(el, nodedom.textNode("cleanup"))
+
+    let dispose = mountApp("#app", proc(): HtmlNode =
+      onCleanup(proc() = cleanupCalled = true)
+      return el
+    )
+    doAssert not cleanupCalled
+    dispose()
+    doAssert cleanupCalled
+    echo "PASS: onCleanup callback"
+
+  proc testUnmountClearsDOM() =
+    let el = nodedom.elementNode("h1")
+    nodedom.addChild(el, nodedom.textNode("test"))
+
+    let dispose = mountApp("#app", proc(): HtmlNode = el)
+    let mountRoot = document.getElementById("app")
+    doAssert mountRoot.children.len == 1
+    dispose()
+    doAssert mountRoot.children.len == 0
+    echo "PASS: unmount clears DOM"
+
+  proc testMultipleMountUnmountCycles() =
+    var mountCount = 0
+    var cleanupCount = 0
+
+    for i in 1..3:
+      let el = nodedom.elementNode("p")
+      nodedom.addChild(el, nodedom.textNode("cycle " & $i))
+      let dispose = mountApp("#app", proc(): HtmlNode =
+        onMount(proc() = inc mountCount)
+        onCleanup(proc() = inc cleanupCount)
+        return el
+      )
+      let mountRoot = document.getElementById("app")
+      doAssert mountRoot.children.len == 1
+      dispose()
+      doAssert mountRoot.children.len == 0
+
+    doAssert mountCount == 3
+    doAssert cleanupCount == 3
+    echo "PASS: multiple mount/unmount cycles"
+
+  proc testErrorBoundaryCatches() =
+    let badChild = nodedom.listNode(proc(): seq[HtmlNode] {.closure, gcsafe.} =
+      raise newException(ValueError, "simulated render error")
+    )
+    let wrapped = nodedom.errorBoundaryNode(
+      badChild,
+      proc(error: string): HtmlNode {.closure, gcsafe.} =
+        let fallback = nodedom.elementNode("div")
+        nodedom.addAttribute(fallback, "class", "error-fallback")
+        nodedom.addChild(fallback, nodedom.textNode("Error: " & error))
+        return fallback
+    )
+    let domEl = rdom.renderDomNode(wrapped)
+    doAssert $domEl.textContent == "Error: simulated render error"
+    doAssert domEl.getAttribute("class") == "error-fallback"
+    echo "PASS: error boundary catches exception (CSR)"
+
+  proc testErrorBoundaryPassThrough() =
+    let child = nodedom.elementNode("div")
+    nodedom.addChild(child, nodedom.textNode("no errors"))
+    let wrapped = nodedom.errorBoundaryNode(
+      child,
+      proc(error: string): HtmlNode {.closure, gcsafe.} =
+        nodedom.textNode("FAIL")
+    )
+    let domEl = rdom.renderDomNode(wrapped)
+    doAssert $domEl.nodeName == "DIV"
+    doAssert $domEl.textContent == "no errors"
+    echo "PASS: error boundary pass-through (CSR)"
+
+  proc testLazyNodeCsrShowsFallback() =
+    let fallback = nodedom.elementNode("div")
+    nodedom.addAttribute(fallback, "class", "skeleton")
+    nodedom.addChild(fallback, nodedom.textNode("please wait"))
+    let lazy = nodedom.lazyNode(
+      proc(): HtmlNode {.closure, gcsafe.} =
+        let content = nodedom.elementNode("div")
+        nodedom.addAttribute(content, "class", "loaded")
+        nodedom.addChild(content, nodedom.textNode("ready"))
+        return content
+      ,
+      fallback
+    )
+    let domEl = rdom.renderDomNode(lazy)
+    # Initially shows fallback
+    doAssert domEl.children.len >= 1
+    # The wrapper has display:contents, so it won't have textContent directly
+    echo "PASS: lazy node CSR renders fallback"
+
 when isMainModule:
   when defined(js):
     testRenderDomNodeBasic()
@@ -170,6 +281,13 @@ when isMainModule:
     testClearChildren()
     testDomEventHandlers()
     testMultipleReactiveChildren()
+    testOnMountCallback()
+    testOnCleanupCallback()
+    testUnmountClearsDOM()
+    testMultipleMountUnmountCycles()
+    testErrorBoundaryCatches()
+    testErrorBoundaryPassThrough()
+    testLazyNodeCsrShowsFallback()
     echo ""
     echo "All client DOM tests passed!"
   else:

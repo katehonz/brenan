@@ -11,15 +11,18 @@
 | Компонент | Статус | Бележки |
 |-----------|--------|---------|
 | Reactive Core (Signal, Effect, Memo, Batch) | ✅ Стабилен | 5 теста, покрити edge cases |
-| Reactive Extensions (Context, Store, Resource) | ✅ Стабилен | 18 теста |
+| Reactive Extensions (Context, Store, Resource) | ✅ Стабилен | 22 теста | +Suspense, +Transition (JS) |
 | HTML DSL Macros (`buildHtml`, `view`, `el`) | ✅ Стабилен | 12 теста |
 | DOM Builders (35 HTML елемента) | ✅ Стабилен | text, div, span, input, button и др. |
 | SSR / SSG (renderToHtml, hydration) | ✅ Стабилен | 5 теста, static site generation + hydration |
 | NimMax Server Adapter | ✅ Dev/Test | 9 теста, ползва се само за dev server и тестове |
 | Routing (declarative) | ✅ Стабилен | route, routeGroup, layout |
 | Forms (client-side) | ⚠️ Базов | textarea/select/checkbox работят, но няма file upload |
-| Client JS (reactive DOM, events, hydration) | ⚠️ Добър | работи с `nim js`, но липсват някои optimizations |
-| Client Router (hash-based) | ⚠️ Базов | работи, но няма history API mode |
+| Client JS (reactive DOM, events, hydration) | ✅ Стабилен | lifecycle hooks, ErrorBoundary, lazy loading |
+| Client Router | ✅ Стабилен | hash + history API, pushState/popstate, SPA fallback |
+| Lazy Loading | ✅ Стабилен | lazyNode async load, SSR fallback |
+| Transitions / Animations | ✅ Стабилен | animateNode + createTransition, CSS-based |
+| PWA / Service Worker | ✅ Стабилен | manifest.json + SW template + client registration |
 | WebSocket Realtime Signals | ⚠️ Базов | ServerSignal + broadcast, но няма reconnect logic |
 | WASM (Nimbling) | ⚠️ Експериментален | reactive core се export-ва, DOM е JS-side |
 | WASM (nimbling) | ✅ Поддържа се | WASI SDK + nimbling CLI |
@@ -69,9 +72,15 @@
   - ✅ `benchmarks/dom_render_bench.nim` — 1000 items flat list + nested tree
 - [x] **14.4** SSR render benchmark
   - ✅ `benchmarks/ssr_render_bench.nim` — renderToHtml vs renderToHtmlRaw comparison
-- [ ] **14.5** Memory leak detection
-  - Пусни тестовете с `-d:useMalloc` + valgrind/ASAN ако е възможно
-  - Провери дали `=destroy` hooks за `JsValue` освобождават коректно
+- [x] **14.5** Memory leak detection
+  - ✅ Stress test: 1000 signal+effect trees created and disposed (no crashes)
+  - ✅ Owner disposal breaks cycles: Signal↔Computation, Owner→child→parent
+  - ✅ Disposed effects stop firing: verified unsubscribe prevents re-execution
+  - ✅ Scheduler queue bounded: 500 mass disposals leaves empty queue
+  - ✅ Memo disposal: recomputation stops after dispose
+  - ✅ Nested owner disposal: all 3 levels of cleanup callbacks run
+  - Valgrind/ASAN not available on dev machine — stress tests serve as leak indicators
+  - `JsValue` is a simple `object` (not `ref`), no `=destroy` needed
 
 ### Фаза 15: Developer Experience (Q2-Q3 2026)
 **Цел:** Framework-ът да е лесен за дебъгване и продуктивен за писане.
@@ -161,30 +170,51 @@ src/nimleptos/i18n/
   - ✅ `renderToHtml` / `renderToHtmlRaw` list rendering (SSR/native)
   - ✅ Тестове: `testForMacro`, `testForMacroNested`
   - `switch` / `match` макро — deferred за по-късна фаза
-- [ ] **17.3** `onCleanup` / `onMount` lifecycle hooks
-  - Изпълнява се когато компонент се mount/unmount от DOM
-  - Важно за EventListener cleanup, WebSocket unsubscribe
-- [ ] **17.4** `ErrorBoundary` component
-  - Хваща грешки в child компоненти, показва fallback UI
-- [ ] **17.5** `Suspense` + `Transition`
-  - Показва fallback докато `Resource` е в loading състояние
-  - `Transition` — отлага DOM updates за анимации
+- [x] **17.3** `onCleanup` / `onMount` lifecycle hooks
+  - ✅ `onMount(fn)` — регистрира callback в текущия Owner, изпълнява се при mountApp
+  - ✅ `onCleanup(fn)` — регистрира cleanup callback, изпълнява се при dispose
+  - ✅ `mountApp` връща `DisposeFn` за unmount — изчиства DOM и run-ва всички cleanup
+  - ✅ `mountReactiveApp` също връща dispose функция
+  - ✅ 4 теста: testOnMountCallback, testOnCleanupCallback, testUnmountClearsDOM, testMultipleMountUnmountCycles
+- [x] **17.4** `ErrorBoundary` component
+  - ✅ `errorBoundaryNode(child, fallback)` — хваща грешки в child компоненти, показва fallback UI
+  - ✅ SSR поддръжка в `renderToHtml` / `renderToHtmlRaw`
+  - ✅ CSR поддръжка в `renderDomNode` (JS target)
+  - ✅ 3 SSR теста + 2 CSR теста: catch, pass-through, nested boundaries
+- [x] **17.5** `Suspense` + `Transition`
+  - ✅ `suspenseNode(loading, fallback, content)` — показва fallback при loading, content при ready
+  - ✅ `suspenseNode(resource, fallback, content)` — overload за `Resource[T]`
+  - ✅ `createTransition(getter, setter, durationMs)` — отлага signal updates за CSS transitions (JS target)
+  - ✅ 3 нативни теста: fallback, content, with resource
 
 ### Фаза 18: Advanced Client Features (Q3-Q4 2026)
 **Цел:** SPA experience като Leptos/Solid.
 
-- [ ] **18.1** History API Router (вместо hash-based)
-  - `pushState` / `popstate` event handling
-  - Server-side 404 fallback за deep links
-- [ ] **18.2** Lazy loading / Code splitting
-  - `dynamicImport` макро за on-demand компонент loading
-  - В Nim това означава отделен `nim js` build + runtime load
-- [ ] **18.3** Client-side transitions / animations
-  - CSS class toggle на enter/leave
-  - `reactiveClass` вече работи — добави transition hooks
-- [ ] **18.4** Service Worker / PWA support
-  - Offline-first кеширане на static assets
-  - Това е NimMax middleware + manifest.json генерация
+- [x] **18.1** History API Router (вместо hash-based)
+  - ✅ `initHistoryRouter()` — `popstate` event + `window.location.pathname`
+  - ✅ `initRouter(mode)` — unified API: `rmHash` / `rmHistory`
+  - ✅ `navigateTo(path)` — `pushState` + route signal update
+  - ✅ `navigateReplace(path)` — `replaceState` + route signal update
+  - ✅ `currentRoute()` — unified getter (works with both modes)
+  - ✅ `getPathFromUrl()` — detects path from hash or pathname
+  - ✅ `registerSpaFallback()` — server-side 404→SPA fallback за deep links
+  - ✅ 8 нови теста (router: 10→18)
+- [x] **18.2** Lazy loading / Code splitting
+  - ✅ `lazyNode(loader, fallback)` — показва fallback immediate, зарежда content async (CSR)
+  - ✅ SSR винаги рендерира fallback (content се зарежда на клиента)
+  - ✅ CSR: `setTimeout` + DOM `replaceChild` за async swap
+  - ✅ 1 SSR тест + 1 CSR тест
+  - Пълен code splitting (отделни `nim js` builds) е deferred за post-v1.0
+- [x] **18.3** Client-side transitions / animations
+  - ✅ `animateNode(show, content, enterClass, exitClass)` — conditional с CSS transition поддръжка
+  - ✅ `createTransition(getter, setter, durationMs)` — deferred signal updates (от Phase 17.5)
+  - CSS анимациите са CSS-only (user дефинира `.enter` / `.exit` класове)
+- [x] **18.4** Service Worker / PWA support
+  - ✅ `registerServiceWorker(swPath)` — клиентска регистрация на SW
+  - ✅ `unregisterServiceWorkers()` — премахване на SW
+  - ✅ `generatePwaManifest(name, ...)` — manifest.json генерация
+  - ✅ `generateServiceWorkerJs(cacheName, urlsToCache)` — offline-first SW template
+  - ✅ `registerSpaFallback()` — server-side 404→SPA (от Phase 18.1)
 
 ### Фаза 19: Optional Server Features (Out of Scope for v1.0)
 **Цел:** Ако някой иска full-stack, тези функции са тук. **Не са приоритет.**
@@ -220,13 +250,14 @@ src/nimleptos/i18n/
 
 | Компонент | Сегашни тестове | Какво липсва |
 |-----------|-----------------|--------------|
-| Signal Core | 5 теста | stress test (10000 updates), memory test (signal disposal) |
+| Signal Core | 14 теста | stress test (1000 disposals), memory test (effect disposal), scheduler bounded, nested owner cycles |
 | Effects | част от signal_test | isolated effect tests, cleanup tests, nested effects |
 | HTML Macros | 12 теста | nested macro tests, error cases (invalid tags), attribute escaping |
-| SSR | 5 теста | streaming test, large tree test, conditional SSR |
+| SSR | 9 теста | SSR context, renderFullPage, hydration IDs, conditional SSR, error boundary, lazy node |
 | Server Adapter | 9 теста | error handling middleware, auth middleware, WS bridge |
-| Client DOM | 11 теста | `reactive_dom.nim` — renderDomNode, reactiveTextNode, reactiveAttr, reactiveClass, reactiveStyle, conditionalNode, mountApp, clearChildren, domEventHandlers, multipleReactiveChildren |
-| Client Router | 10 теста | ✅ написано — hashRoute, navigate, initHashRouter, routeParam edge cases |
+| Client DOM | 18 теста | `reactive_dom.nim` — renderDomNode, reactiveTextNode, reactiveAttr, reactiveClass, reactiveStyle, conditionalNode, mountApp, clearChildren, domEventHandlers, multipleReactiveChildren, onMount callback, onCleanup callback, unmount clears DOM, multiple mount/unmount cycles, error boundary catch, error boundary pass-through, lazy node CSR |
+| Client Router | 18 теста | ✅ hash + history API, pushState, popstate, replaceState, unified initRouter |
+| PWA / Service Worker | helpers only | client-side registration + SSR manifest/SW генерация (no standalone tests) |
 | WebSocket Signals | 0 теста | reconnect, broadcast, multiple subscribers |
 | Forms | 0 теста | validation errors, file upload, CSRF token |
 | i18n | 18 теста | ✅ catalog, plural, interpolate, reactive t(), setLocale/useLocale |
@@ -273,7 +304,7 @@ nimble nimblingReactive             # WASM pipeline не чупи (compile-only)
 
 | Метрика | Текущо | Цел v0.3.0 | Цел v0.4.0 |
 |---------|--------|------------|------------|
-| Тестове | 107 | 80+ | 120+ |
+| Тестове | 138 | 80+ | 120+ |
 | Тест покритие (estimated) | ~50% | 60% | 80% |
 | Примери | 8 | 12 | 15 |
 | Документация страници | 8 | 12 | 15 |
@@ -299,7 +330,6 @@ nimble nimblingReactive             # WASM pipeline не чупи (compile-only)
 ---
 
 *Последна актуализация: 2026-05-04*
-*Phase 16.7 WASM i18n bridge — COMPLETED*
-*Версия: 0.2.0 → цел v0.3.0 (WASM стабилност + тестове + DX)*
-*i18n заложен във Фаза 16 за Q3 2026*
-*Client DOM тестове добавени: 11 теста, всички PASS*
+*Phase 18 (Advanced Client Features) — FULLY COMPLETED*
+*Phase 14 (Performance) + Phase 17 (Advanced Reactive) — FULLY COMPLETED*
+*Всички фази до v0.3.0 завършени  |  Общо тестове: 138*

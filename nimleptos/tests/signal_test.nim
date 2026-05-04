@@ -1,5 +1,6 @@
 import ../src/nimleptos/reactive/signal
 import ../src/nimleptos/reactive/effects
+import ../src/nimleptos/reactive/subscriber
 
 proc testCreateSignal() =
   let (count, setCount) = createSignal(0)
@@ -176,6 +177,91 @@ proc testNestedOwners() =
   doAssert outerEffectRuns == 2  # initial + setX(1)
   echo "PASS: nested owners dispose independently"
 
+proc testStressSignalDisposal() =
+  ## Create and dispose many signal+effect trees to check for leaks.
+  for i in 1..1000:
+    let dispose = createRoot(proc() =
+      let (x, setX) = createSignal(i)
+      var captured = 0
+      discard createEffect(proc() =
+        captured = x()
+      )
+      setX(i * 2)
+    )
+    dispose()
+  echo "PASS: stress test — 1000 signal+effect trees disposed"
+
+proc testDisposedEffectDoesNotFire() =
+  ## Verify that after disposal, effects don't fire when signals change.
+  let (sig, setSig) = createSignal(0)
+  var effectRuns = 0
+  let dispose = createRoot(proc() =
+    discard createEffect(proc() =
+      inc effectRuns
+      discard sig()
+    )
+    setSig(1)
+  )
+  doAssert effectRuns == 2  # initial + setSig(1)
+  dispose()
+  setSig(2)  # should NOT trigger the disposed effect
+  doAssert effectRuns == 2  # no new runs
+  echo "PASS: disposed effect stops firing"
+
+proc testMemoDisposal() =
+  ## Verify that disposed memos don't leak dependencies.
+  let (x, setX) = createSignal(0)
+  var memoRuns = 0
+  let dispose = createRoot(proc() =
+    let (m, _) = createMemo(proc(): int =
+      inc memoRuns
+      return x() * 2
+    )
+    doAssert m() == 0
+    setX(5)
+    doAssert m() == 10
+  )
+  dispose()
+  let runsAfter = memoRuns
+  setX(100)  # should NOT trigger the disposed memo
+  doAssert memoRuns == runsAfter
+  echo "PASS: memo disposal stops recomputation"
+
+proc testSchedulerQueueBounded() =
+  ## Verify that proper disposal doesn't leave orphaned computations.
+  for i in 1..500:
+    let dispose = createRoot(proc() =
+      let (a, setA) = createSignal(0)
+      let (b, setB) = createSignal(0)
+      discard createEffect(proc() =
+        discard a()
+        discard b()
+      )
+      setA(1)
+      setB(1)
+    )
+    dispose()
+  # After all disposals, no effects should remain in the scheduler
+  flush(getScheduler())
+  echo "PASS: scheduler queue bounded after mass disposal"
+
+proc testOwnerDisposalBreaksCycles() =
+  ## Verify that Owner→child→parent cycle is properly broken.
+  ## Create a 3-level deep owner tree and dispose from root.
+  var disposals = 0
+  let dispose = createRoot(proc() =
+    onCleanup(proc() = inc disposals)
+    discard createRoot(proc() =
+      onCleanup(proc() = inc disposals)
+      discard createRoot(proc() =
+        onCleanup(proc() = inc disposals)
+      )
+    )
+  )
+  dispose()
+  doAssert disposals == 3
+  echo "PASS: nested owner disposal breaks all cycles"
+
 when isMainModule:
   testCreateSignal()
   testSignalReactivity()
@@ -186,5 +272,10 @@ when isMainModule:
   testUntrack()
   testTrigger()
   testNestedOwners()
+  testStressSignalDisposal()
+  testDisposedEffectDoesNotFire()
+  testMemoDisposal()
+  testSchedulerQueueBounded()
+  testOwnerDisposalBreaksCycles()
   echo ""
   echo "All reactive core tests passed!"

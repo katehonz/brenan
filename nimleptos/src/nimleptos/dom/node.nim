@@ -26,6 +26,10 @@ type
     elseBranch*: HtmlNode  ## Shown when condition is false
     listItems*: proc(): seq[HtmlNode] {.closure, gcsafe.}  ## For list rendering (For macro)
     domEventHandlers*: seq[(string, DomEventHandler)]  ## Event handlers for CSR
+    childBranch*: HtmlNode  ## For ErrorBoundary — the wrapped child tree
+    errorCatcher*: proc(error: string): HtmlNode {.closure, gcsafe.}  ## Fallback UI factory
+    lazyLoader*: proc(): HtmlNode {.closure, gcsafe.}  ## For lazy loading — loads content async
+    fallbackBranch*: HtmlNode  ## Shown while lazy content is loading
 
 proc escapeHtml*(s: string): string =
   result = s
@@ -67,6 +71,22 @@ proc listNode*(itemsGetter: proc(): seq[HtmlNode] {.closure, gcsafe.}): HtmlNode
   result = elementNode("list")
   result.listItems = itemsGetter
 
+proc errorBoundaryNode*(child: HtmlNode, fallback: proc(error: string): HtmlNode {.closure, gcsafe.}): HtmlNode =
+  ## Create an ErrorBoundary node that catches rendering errors.
+  ## If `child` throws during rendering, `fallback` is called with the error message.
+  result = HtmlNode(isText: false, childBranch: child, errorCatcher: fallback)
+
+proc lazyNode*(loader: proc(): HtmlNode {.closure, gcsafe.}, fallback: HtmlNode): HtmlNode =
+  ## Create a lazy-loaded node. Shows `fallback` immediately, then loads
+  ## content via `loader` asynchronously. In SSR, always shows fallback.
+  ##
+  ## Usage:
+  ##   let node = lazyNode(
+  ##     proc(): HtmlNode = heavyComponent(),
+  ##     buildHtml: div(class="skeleton"): text("Loading...")
+  ##   )
+  result = HtmlNode(isText: false, lazyLoader: loader, fallbackBranch: fallback)
+
 proc addEvent*(node: HtmlNode, event: string, handlerId: string) =
   node.events.add((event, handlerId))
 
@@ -77,6 +97,14 @@ proc addChild*(node: HtmlNode, child: HtmlNode) =
   node.children.add(child)
 
 proc renderToHtml*(node: HtmlNode): string =
+  if node.childBranch != nil:
+    try:
+      return renderToHtml(node.childBranch)
+    except:
+      let msg = getCurrentExceptionMsg()
+      return renderToHtml(node.errorCatcher(msg))
+  if node.lazyLoader != nil:
+    return renderToHtml(node.fallbackBranch)
   if node.isText:
     return escapeHtml(node.text)
   if node.condition != nil:
@@ -100,6 +128,14 @@ proc renderToHtml*(node: HtmlNode): string =
   result &= "</" & node.tag & ">"
 
 proc renderToHtmlRaw*(node: HtmlNode): string =
+  if node.childBranch != nil:
+    try:
+      return renderToHtmlRaw(node.childBranch)
+    except:
+      let msg = getCurrentExceptionMsg()
+      return renderToHtmlRaw(node.errorCatcher(msg))
+  if node.lazyLoader != nil:
+    return renderToHtmlRaw(node.fallbackBranch)
   if node.isText:
     return node.text
   if node.condition != nil:

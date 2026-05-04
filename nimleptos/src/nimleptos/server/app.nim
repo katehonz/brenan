@@ -74,6 +74,30 @@ proc newGroup*(app: NimLeptosApp, prefix: string,
 proc registerErrorHandler*(app: NimLeptosApp, code: HttpCode, handler: ErrorHandler) =
   app.nimmaxApp.registerErrorHandler(code, handler)
 
+proc registerSpaFallback*(app: NimLeptosApp, node: HtmlNode) =
+  ## Register a fallback that serves the SPA for any unmatched GET route.
+  ## Required for History API routing: the server must always return the SPA
+  ## so the client-side router can handle deep links (e.g., /about, /post/42).
+  ##
+  ## Usage:
+  ##   let app = newNimLeptosApp()
+  ##   app.get("/api/data", handler)
+  ##   app.registerSpaFallback(buildHtml: div(id="app"): text("Loading..."))
+  ##   app.run()
+  app.nimmaxApp.registerErrorHandler(
+    Http404,
+    proc(ctx: Context): Future[void] {.async.} =
+      if ctx.request.httpMethod == HttpGet:
+        withReactiveContext:
+          let ssrCtx = newSSRContext()
+          if app.clientScript.len > 0:
+            ssrCtx.addScript(app.clientScript)
+          if app.clientStyle.len > 0:
+            ssrCtx.addStyle(app.clientStyle)
+          let html = renderPageWithHydration(ssrCtx, node, app.defaultTitle)
+          ctx.html(html)
+  )
+
 proc onStart*(app: NimLeptosApp, handler: Event) =
   app.nimmaxApp.onStart(handler)
 

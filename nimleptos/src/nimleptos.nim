@@ -3,6 +3,7 @@ import nimleptos/reactive/effects
 import nimleptos/reactive/context
 import nimleptos/reactive/store
 import nimleptos/reactive/resource
+import nimleptos/reactive/components
 import nimleptos/dom/node
 import nimleptos/dom/elements
 import nimleptos/macros/html_macros
@@ -15,6 +16,7 @@ import nimleptos/client/http_client
 import nimleptos/client/router
 import nimleptos/client/hydration_client
 import nimleptos/client/event_handlers
+import nimleptos/client/pwa
 import nimleptos/server/adapter
 import nimleptos/server/app
 import nimleptos/server/middleware
@@ -31,6 +33,7 @@ export effects
 export context
 export store
 export resource
+export components
 export node
 export elements
 export html_macros
@@ -43,6 +46,7 @@ export http_client
 export router
 export hydration_client
 export event_handlers
+export pwa
 export adapter
 export app
 export middleware
