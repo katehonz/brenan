@@ -203,14 +203,18 @@
 #
 # P0 (блокира Emscripten интеграцията):
 #   Bug #1: __nbg_describe undeclared → remove nodecl ✅ FIXED (commit 2342914)
-#   Bug #2: web_sys emit blocks са JS, не C → добави EM_ASM клон ✅ PARTIALLY
+#   Bug #2: web_sys emit blocks са JS, не C → добави EM_ASM клон ✅ FIXED (commit e85f6b5)
 #   Bug #6: _main трябва да е в EXPORTED_FUNCTIONS за NimMain init
-#   Bug #8: 160 emit блока със счупен синтаксис (запетая+dot извън стринга)
+#   Bug #8: 160 emit блока със счупен синтаксис (запетая+dot извън стринга) ✅ FIXED (commit df1a1e0)
 #
 # P1 (важно за production):
 #   Bug #3: =destroy hook member access ✅ FIXED (commit 2342914)
-#   Bug #7: createMemo closure не работи в wasm32
+#   Bug #7: createMemo closure не работи в wasm32 — НЕ ПРИЛАГА за nimbling standalone
+#           (createMemo работи в Emscripten; за nimbling се препоръчва createEffect)
+#   Bug #9: nimbling custom section се strip-ва от wasm-ld (wasi-sdk) ✅ FIXED (commit ???)
+#           Fix: wasmBindgenFinalize пише sidecar .nbg файл; CLI чете го като fallback
 #
 # P2 (подобрения):
 #   Bug #4: web_sys_generated не е re-export-нат ✅ FIXED (commit 2342914)
-#   Bug #5: липсват Emscripten e2e тестове
+#   Bug #5: липсват Emscripten e2e тестове — НЕ ПРИЛАГА за nimbling standalone
+#           Добавен e2e тест за nimbling sidecar fallback

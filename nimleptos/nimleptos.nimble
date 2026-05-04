@@ -95,22 +95,36 @@ task wasmCounter, "Compile full WASM counter (signals + EM_ASM DOM updates + HTM
   echo "Build complete. Open examples/wasm_counter/index.html in a browser."
 
 task nimblingReactive, "Compile reactive core example for nimbling WASM":
+  let outDir = "examples/nimbling_reactive"
+  let nimcache = outDir & "/nimcache"
   echo "Building nimbling reactive counter..."
   exec "nim c --cc:clang --cpu:wasm32 --os:standalone --mm:orc -d:wasm32 " &
-    "-p:src --compileOnly --nimcache:examples/nimbling_reactive/nimcache " &
-    "examples/nimbling_reactive/counter.nim"
+    "-p:src --compileOnly --nimcache:" & nimcache & " " &
+    outDir & "/counter.nim"
+
+  # Copy .nbg sidecar to example dir so CLI can find it
+  for file in listFiles("."):
+    if file.endsWith(".nbg"):
+      let dst = outDir & "/" & extractFilename(file)
+      cpFile(file, dst)
+      rmFile(file)
+      echo "Moved sidecar: " & file & " -> " & dst
+
   echo ""
-  echo "C files generated in examples/nimbling_reactive/nimcache"
+  echo "C files generated in " & nimcache
   echo ""
   echo "Next steps:"
-  echo "  1. Link to WASM (requires WASI SDK or Zig):"
-  echo "     zig cc -target wasm32-wasi-musl -nostdlib -Wl,--no-entry -Wl,--export-all"
-  echo "       -I/usr/local/lib/nim/lib -o counter.wasm nimcache/*.c"
+  echo "  1. Link to WASM (requires WASI SDK):"
+  echo "     export WASI_SDK_PATH=/path/to/wasi-sdk"
+  echo "     clang --target=wasm32-wasi --sysroot=\\$WASI_SDK_PATH/share/wasi-sysroot"
+  echo "       -nostartfiles -O3 -Wno-implicit-function-declaration"
+  echo "       -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined -Wl,--no-gc-sections"
+  echo "       -o counter.wasm nimcache/*.c"
   echo ""
   echo "  2. Post-process with nimbling CLI:"
   echo "     nimbling counter.wasm --out-dir pkg/ --target bundler"
   echo ""
-  echo "  3. Open examples/nimbling_reactive/index.html in a browser"
+  echo "  3. Open " & outDir & "/index.html in a browser"
 
 task bench, "Run all benchmarks":
   exec "nim c -r --threads:on -p:src benchmarks/signal_bench.nim"
@@ -128,3 +142,4 @@ task benchSsr, "Run SSR render benchmark":
 
 task cleanWasm, "Clean WASM build artifacts":
   exec "rm -rf examples/nimbling_reactive/nimcache examples/nimbling_counter/nimcache"
+  exec "rm -f examples/nimbling_reactive/*.nbg examples/nimbling_counter/*.nbg"
