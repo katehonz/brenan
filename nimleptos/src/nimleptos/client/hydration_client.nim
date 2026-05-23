@@ -7,8 +7,8 @@ when defined(js):
     HydrationState* = ref object
       nextId*: int
       nodeCount*: int
-      hydrated: bool
-      initialState: JsonNode
+      hydrated*: bool
+      initialState*: JsonNode
 
     HydrationCallback* = proc(node: DomElement, nlId: string) {.closure.}
 
@@ -78,8 +78,8 @@ else:
     HydrationState* = ref object
       nextId*: int
       nodeCount*: int
-      hydrated: bool
-      initialState: JsonNode
+      hydrated*: bool
+      initialState*: JsonNode
 
   proc hydrateApp*(): HydrationState =
     HydrationState(nextId: 0, nodeCount: 0, hydrated: false, initialState: newJNull())

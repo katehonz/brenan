@@ -19,6 +19,14 @@ proc createEffect*(effect: proc() {.closure.}): Computation =
 
   return comp
 
+proc createEffect*(effect: proc() {.closure.}, name: string): Computation =
+  ## Create a named effect for easier debugging in DevTools.
+  result = createEffect(effect)
+  result.debugName = name
+
+proc setComputationName*(comp: Computation, name: string) =
+  comp.debugName = name
+
 type
   MemoPair*[T] = tuple[getter: Getter[T], computation: Computation]
   MemoCache[T] = ref object
@@ -61,3 +69,8 @@ proc createMemo*[T](compute: proc(): T {.closure.}): MemoPair[T] =
     )
 
   return (getter, comp)
+
+proc createMemo*[T](compute: proc(): T {.closure.}, name: string): MemoPair[T] =
+  ## Create a named memo for easier debugging in DevTools.
+  result = createMemo(compute)
+  result[1].debugName = name

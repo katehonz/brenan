@@ -17,6 +17,6 @@
 ##   nimbling examples/nimbling_i18n/i18n.wasm \
 ##     --out-dir examples/nimbling_i18n/pkg/ --target bundler
 
-import nimleptos/wasm/i18n_wasm
+import nimleptos/_archive/wasm/i18n_wasm
 # Ensure the module's wasmBindgen exports are included
 discard

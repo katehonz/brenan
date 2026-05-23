@@ -14,7 +14,7 @@ type
     mounted*: bool
     mountCallbacks*: seq[proc() {.closure.}]
 
-when defined(js) or defined(wasm32):
+when defined(js):
   var currentOwner {.global.}: Owner
 else:
   var currentOwner {.threadvar.}: Owner

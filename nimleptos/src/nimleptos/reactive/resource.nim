@@ -70,8 +70,7 @@ proc refetch*[T](res: Resource[T]) =
   res.setState(rsLoading)
   res.setLoading(true)
 
-  when defined(wasm32):
-    ## Wasm without full exception support — fetcher errors are fatal.
+  try:
     let val = res.fetcher()
     if myFetchId != res.pendingFetchId:
       return  # stale fetch, ignore result
@@ -79,26 +78,15 @@ proc refetch*[T](res: Resource[T]) =
     res.setValue(val)
     res.setState(rsReady)
     res.setError("")
-    res.setLoading(false)
     res.lastCompletedFetchId = myFetchId
-  else:
-    try:
-      let val = res.fetcher()
-      if myFetchId != res.pendingFetchId:
-        return  # stale fetch, ignore result
-      res.currentValue = val
-      res.setValue(val)
-      res.setState(rsReady)
-      res.setError("")
-      res.lastCompletedFetchId = myFetchId
-    except:
-      if myFetchId != res.pendingFetchId:
-        return  # stale fetch, ignore error
-      res.setError(getCurrentExceptionMsg())
-      res.setState(rsError)
-      res.lastCompletedFetchId = myFetchId
-    finally:
-      res.setLoading(false)
+  except:
+    if myFetchId != res.pendingFetchId:
+      return  # stale fetch, ignore error
+    res.setError(getCurrentExceptionMsg())
+    res.setState(rsError)
+    res.lastCompletedFetchId = myFetchId
+  finally:
+    res.setLoading(false)
 
 proc createResource*[T](fetcher: proc(): T {.closure.}): Resource[T] =
   ## Creates a Resource with a synchronous fetcher.

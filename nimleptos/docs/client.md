@@ -1,31 +1,65 @@
-# Client-Side Rendering & Hydration
+# Client-Side Development with NimLeptos
 
-NimLeptos supports both **Server-Side Rendering (SSR)** with client hydration and **pure Client-Side Rendering (CSR)** via `nim js` compilation.
+NimLeptos compiles directly to JavaScript via `nim js`, giving you fine-grained reactive DOM updates without WASM or external toolchains.
 
----
+## Quick Start
 
-## Two Modes
+```bash
+nim js -p:src -o:app.js myapp.nim
+```
 
-| Mode | Compilation | Use Case |
-|------|-------------|----------|
-| **SSR + Hydration** | `nim c` (server) + `nim js` (client) | SEO, fast first paint, progressive enhancement |
-| **Pure CSR** | `nim js` only | SPAs, dashboards, internal tools |
+Then load `app.js` in an HTML file:
 
----
+```html
+<div id="app"></div>
+<script src="app.js"></script>
+```
 
-## Pure Client-Side Rendering
+## Compiling to JavaScript
 
-### mountReactiveApp
+### Basic compilation
 
-Mount reactive DOM elements directly for fine-grained control:
+```bash
+nim js -p:src -o:app.js app.nim
+```
+
+### Production build (smaller bundle)
+
+```bash
+nim js -d:release --opt:size -p:src -o:app.js app.nim
+```
+
+### With source maps
+
+```bash
+nim js -g -p:src -o:app.js app.nim
+```
+
+### Recommended flags
+
+| Flag | Purpose |
+|------|---------|
+| `-d:release` | Enable release optimizations |
+| `--opt:size` | Optimize for bundle size |
+| `-g` | Generate source maps |
+| `-d:nimleptosDebug` | Enable debug logging |
+
+## Reactive DOM
+
+### Mounting an app
 
 ```nim
+import nimleptos/client/reactive_dom
+import nimleptos/reactive/signal
+
 when defined(js):
-  proc counterApp(): seq[DomElement] =
+  proc myApp(): seq[DomElement] =
     let (count, setCount) = createSignal(0)
 
     let display = createElement("p")
-    let textEl = reactiveTextNode(proc(): string = "Count: " & $count())
+    let textEl = reactiveTextNode(proc(): string =
+      "Count: " & $count()
+    )
     display.appendChild(textEl)
 
     let btn = createElement("button")
@@ -36,199 +70,268 @@ when defined(js):
 
     return @[display, btn]
 
-  mountReactiveApp("#app", counterApp)
+  mountReactiveApp("#app", myApp)
 ```
 
-### mountApp
+### Available bindings
 
-Mount an `HtmlNode` tree to the DOM (converts to real DOM elements):
-
-```nim
-when defined(js):
-  proc app(): HtmlNode =
-    buildHtml:
-      el("div", class="app"):
-        el("h1"): text("Hello")
-        el("p"): text("World")
-
-  mountApp("#app", app)
-```
-
----
-
-## Reactive DOM Bindings
-
-| Proc | Description |
-|------|-------------|
-| `reactiveTextNode(getter)` | Text node that auto-updates from a `Getter[string]` signal |
-| `reactiveAttr(el, name, getter)` | Attribute bound to a signal |
-| `reactiveClass(el, getter)` | CSS class bound to a signal |
-| `reactiveStyle(el, prop, getter)` | CSS property bound to a signal |
-| `renderDomNode(node)` | Convert `HtmlNode` tree to real DOM elements |
-| `clearChildren(el)` | Remove all child nodes |
-| `mountApp(selector, builder, afterMount)` | Mount HtmlNode tree to DOM |
-| `mountReactiveApp(selector, builder)` | Mount reactive DomElements |
-
-### Example: Reactive Style
-
-```nim
-let (progress, setProgress) = createSignal(0)
-let bar = createElement("div")
-reactiveStyle(bar, "width", proc(): string = $progress() & "%")
-```
-
----
-
-## Hydration (SSR + Client)
-
-Server renders HTML with `data-nl-id` attributes and injects `<script type="application/json" id="__nimleptos_data__">` with state JSON. Client JS reads these markers and attaches handlers without re-rendering.
-
-### HydrationState
-
-```nim
-let state = hydrateApp()
-# state.nextId — next hydration ID
-# state.nodeCount — number of hydrated nodes
-# state.hydrated — true after hydration completes
-```
-
-### onHydrate Callbacks
-
-Register custom handlers that fire for each hydrated node:
-
-```nim
-import nimleptos/client/hydration_client
-
-onHydrate(proc(node: DomElement, nlId: string) =
-  echo "Hydrated node: " & nlId
-  # Attach reactive bindings, event handlers, etc.
-)
-```
-
-### attachEvent
-
-Attach an event handler to a specific DOM element:
-
-```nim
-attachEvent(element, "click", proc(e: Event) =
-  echo "Clicked!"
-)
-```
-
----
-
-## Event Handlers
-
-| Proc | Description |
-|------|-------------|
-| `bindEvent(selector, event, handler)` | Bind event to CSS selector |
-| `bindClick(selector, handler)` | Shorthand for click |
-| `bindSubmit(selector, handler)` | Shorthand for submit |
-| `bindInput(selector, handler)` | Shorthand for input |
-| `applyBindings()` | Apply all registered bindings |
-| `initEventHandlers()` | Init hydration + bindings on DOMContentLoaded |
-
-### EventHandler Type
-
-```nim
-type EventHandler* = proc(e: Event) {.closure.}
-```
-
-Same signature on both JS and native targets (native uses stub `Event` type).
-
----
+- `reactiveTextNode(getter)` — auto-updating text node
+- `reactiveAttr(el, name, getter)` — attribute bound to signal
+- `reactiveClass(el, getter)` — CSS class bound to signal
+- `reactiveStyle(el, prop, getter)` — style property bound to signal
+- `mountApp(selector, builder)` — mount HtmlNode tree
+- `mountReactiveApp(selector, builder)` — mount reactive DomElements
 
 ## DOM Interop
 
-Low-level DOM wrappers in `dom_interop.nim`:
-
-| Proc | Wraps |
-|------|-------|
-| `getElementById(id)` | `document.getElementById` |
-| `querySelector(selector)` | `document.querySelector` |
-| `querySelectorAll(selector)` | `document.querySelectorAll` |
-| `createElement(tag)` | `document.createElement` |
-| `createTextNode(text)` | `document.createTextNode` |
-| `appendChild(parent, child)` | `parent.appendChild` |
-| `removeChild(parent, child)` | `parent.removeChild` |
-| `setAttribute(el, name, value)` | `el.setAttribute` |
-| `getAttribute(el, name)` | `el.getAttribute` |
-| `addEventListener(el, event, handler)` | `el.addEventListener` |
-| `setInnerHtml(el, html)` | `el.innerHTML = ...` |
-| `getInnerHtml(el)` | `el.innerHTML` |
-| `setTextContent(el, text)` | `el.textContent = ...` |
-| `getTextContent(el)` | `el.textContent` |
-| `setStyle(el, prop, value)` | `el.style.setProperty` |
-
----
-
-## Compilation
-
-```bash
-# Compile client-side JS
-nim js -p:src -o:app.js myapp.nim
-
-# Or use nimble tasks
-nimble client      # counter example
-nimble timer       # reactive timer
-nimble hybrid      # buildHtml + reactive DOM
-nimble conditional # reactive if/else
-```
-
----
-
-## HTTP Client
-
-JSON fetch wrapper for calling REST APIs from the browser:
+Low-level DOM helpers in `nimleptos/client/dom_interop`:
 
 ```nim
-import nimleptos/client/http_client
+import nimleptos/client/dom_interop
 
-fetchGetJson("/api/posts", proc(data: JsonNode) =
-  echo data["posts"].len
-)
+let el = createElement("div")
+el.setAttribute("class", "container")
+el.setTextContent("Hello")
 
-fetchPostJson("/api/posts", """{"title":"Hello"}""", proc(data: JsonNode) =
-  echo data["id"]
+# classList helpers
+el.addClass("active")
+el.removeClass("hidden")
+el.toggleClass("open")
+if el.hasClass("active"): ...
+
+# dataset
+el.setDataAttr("id", "42")
+let id = el.getDataAttr("id")
+
+# focus / scroll
+el.focusElement()
+el.scrollIntoView()
+
+# animation
+let animId = requestAnimationFrame(proc(ts: float) = ...)
+cancelAnimationFrame(animId)
+
+# intersection observer (lazy loading)
+let observer = createIntersectionObserver(
+  proc(entries, obs) = ...,
+  threshold = 0.5
 )
+observeElement(observer, el)
 ```
 
-| Proc | Description |
-|------|-------------|
-| `fetchGetJson(url, onSuccess, onError)` | GET request, parse JSON response |
-| `fetchPostJson(url, body, onSuccess, onError)` | POST request with JSON body |
+## Client-Side Routing
 
-## Client-Side Router
-
-Hash-based router for SPAs (no page reloads):
+Hash-based or History API routing:
 
 ```nim
 import nimleptos/client/router
 
-# Initialize once
-initHashRouter()
+when defined(js):
+  initHashRouter()        # or initHistoryRouter()
 
-# Read current route
-let route = hashRoute()()  # e.g. "/" or "/post/5"
+  # Reactive route getter
+  let route = currentRoute()
 
-# Navigate programmatically
-navigate("#/post/5")
+  # Navigate
+  navigate("/about")       # hash mode
+  navigateTo("/about")     # history API
+  navigateReplace("/about") # replace current entry
 
-# Use inside buildHtml for conditional rendering
-buildHtml:
-  if hashRoute()() == "/":
-    el("div"): text("Home")
-  else:
-    el("div"): text("Other page")
+  # Use in effects
+  discard createEffect(proc() =
+    case route():
+      of "/": renderHome()
+      of "/about": renderAbout()
+      else: renderNotFound()
+  )
 ```
 
-| Proc | Description |
-|------|-------------|
-| `initHashRouter()` | Start listening for `hashchange` events |
-| `hashRoute()` | Returns reactive `Getter[string]` for current route |
-| `navigate(path)` | Change `window.location.hash` |
-| `routeParam(route, prefix)` | Extract param after prefix (e.g. `routeParam("/post/5", "/post/") == "5"`) |
+## HTTP Client
 
-## Progressive Enhancement
+Fetch JSON from APIs:
 
-Pages work without JavaScript (server-rendered HTML submits normally) and gain interactivity when JS loads. The hydration system marks SSR-rendered nodes with `data-nl-id` and `data-nl-hydrated` attributes.
+```nim
+import nimleptos/client/http_client
+import std/json
+
+fetchGetJson("/api/posts",
+  onSuccess = proc(data: JsonNode) =
+    echo data.len, " posts loaded"
+  ,
+  onError = proc(msg: string) =
+    echo "Error: ", msg
+)
+```
+
+Or use `Resource[T]` for reactive data fetching:
+
+```nim
+import nimleptos/reactive/resource
+
+let posts = createResource(proc(): seq[Post] =
+  # fetch and return data
+)
+
+echo posts.loading()   # true while fetching
+echo posts.value()     # fetched data
+posts.refetch()        # manually re-fetch
+```
+
+## Client-Side Forms
+
+Build forms with reactive validation:
+
+```nim
+let (email, setEmail) = createSignal("")
+let (errors, setErrors) = createSignal(seq[string](@[]))
+
+proc validate(): seq[string] =
+  if email().len == 0 or '@' notin email():
+    result.add("Invalid email")
+
+input.addEventListener("input", proc(e: Event) =
+  let val = $cast[InputElement](e.target).value
+  setEmail(val)
+  setErrors(validate())
+)
+```
+
+## i18n on the Client
+
+```nim
+import nimleptos/i18n/i18n
+import nimleptos/i18n/catalog
+
+let cat = newMessageCatalog("en")
+cat.addTranslation("en", "hello", "Hello")
+cat.addTranslation("bg", "hello", "Здравей")
+
+let cfg = createI18n(cat, "en")
+
+# Reactive translation
+let hello = cfg.t("hello")   # updates when locale changes
+
+# In buildHtml macro
+let node = buildHtml(cfg):
+  el("h1"): t"hello"
+  el("button", onclick=proc(e: Event) = setLocale(cfg, "bg")):
+    text("Switch to BG")
+```
+
+## Bundler Integration (Vite)
+
+For a modern dev experience with hot reload:
+
+```bash
+cd examples/vite_counter
+npm install
+nimble dev    # starts hotreload + Vite
+```
+
+See `examples/vite_counter/README.md` for details.
+
+## Hot Reload
+
+Watch `.nim` files and auto-recompile:
+
+```bash
+nimble hot    # watches src/ and recompiles counter_client.nim
+```
+
+Or use `tools/dev.sh` for hot reload + Vite together.
+
+## Hydration
+
+When using SSR, hydrate the client app to attach event listeners without re-rendering:
+
+```nim
+import nimleptos/client/hydration_client
+
+# On the server: render with hydration IDs
+let ctx = newSSRContext()
+let root = elDiv([], ...)
+discard injectHydrationIds(root, ctx)
+
+# On the client: hydrate after DOM is ready
+initHydration()
+```
+
+Read initial state from SSR:
+
+```nim
+let theme = getInitialValue("theme", "light")
+let user = getInitialValue("user", "guest")
+```
+
+## Debugging
+
+Enable debug logging:
+
+```bash
+nim js -d:nimleptosDebug -p:src -o:app.js app.nim
+```
+
+This routes `debugLog` / `debugWarn` / `debugError` to `console.log` in the browser.
+
+## Bundle Size
+
+Measured for `examples/counter_client.nim` (minimal signals + DOM app):
+
+| Build | Size | Command |
+|-------|------|---------|
+| Debug | ~220 KB | `nim js -p:src -o:app.js app.nim` |
+| Release | ~165 KB | `nim js -d:release --opt:size -p:src -o:app.js app.nim` |
+| Danger | ~153 KB | `nim js -d:danger --opt:size -p:src -o:app.js app.nim` |
+| Minified (Terser) | ~101 KB | `terser app.js -c -m -o app.min.js` |
+
+Tips for smaller bundles:
+- Always use `-d:release --opt:size` for production
+- Run through a JS minifier like Terser or UglifyJS
+- Import only the modules you need (e.g. `import nimleptos/reactive/signal` instead of `import nimleptos`)
+
+## Cleanup & Disposal
+
+When mounting apps, always keep the dispose function and call it on unmount:
+
+```nim
+let dispose = mountReactiveApp("#app", myApp)
+# ... later
+dispose()  # cleans up all effects, subscriptions, and DOM
+```
+
+Effects and memos created inside a `createRoot` are automatically cleaned up when the root is disposed. Event handlers registered via `bindEvent` are cleared on the next `initEventHandlers` call.
+
+## Debug Names (DevTools)
+
+Give names to effects and memos for easier debugging:
+
+```nim
+let (count, setCount) = createSignal(0)
+
+# Named effect
+discard createEffect(proc() =
+  echo "Count: ", count()
+, "counterEffect")
+
+# Named memo
+let (doubled, _) = createMemo(proc(): int = count() * 2, "doubledMemo")
+```
+
+When `-d:nimleptosDebug` is enabled, logs will include these names where available.
+
+## Common Pitfalls
+
+1. **Server-only modules** — `nimleptos.nim` automatically excludes `server/`, `routing/`, `forms/`, and `realtime/` when compiling with `nim js`. Use specific imports if you need only client modules.
+2. **Threading** — JS target uses plain globals, not `threadvar`. Never add `{.threadvar.}` unconditionally.
+3. **WASM leftovers** — `src/nimleptos/_archive/wasm/` contains archived code. Do not import from there in new projects.
+
+## Examples
+
+| Example | Command | Description |
+|---------|---------|-------------|
+| Counter | `nimble client` | Basic signals + DOM |
+| Router | `nimble routerClient` | Hash-based SPA routing |
+| Fetch | `nimble fetchClient` | HTTP client + Resource |
+| Form | `nimble formClient` | Client-side validation |
+| i18n | `nimble i18nClient` | Reactive translations |
+| Vite | `nimble dev` | Bundler + hot reload |

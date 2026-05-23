@@ -6,6 +6,7 @@ when defined(js):
   import ../src/nimleptos/reactive/effects
   import ../src/nimleptos/client/reactive_dom as rdom
   import ../src/nimleptos/client/event_handlers
+  import ../src/nimleptos/client/dom_interop as domi
 
   proc testRenderDomNodeBasic() =
     let el = nodedom.elementNode("div")
@@ -268,6 +269,37 @@ when defined(js):
     # The wrapper has display:contents, so it won't have textContent directly
     echo "PASS: lazy node CSR renders fallback"
 
+  proc testClassListHelpers() =
+    let el = domi.createElement("div")
+    domi.addClass(el, "foo")
+    doAssert domi.hasClass(el, "foo")
+    domi.addClass(el, "bar")
+    doAssert domi.hasClass(el, "bar")
+    domi.removeClass(el, "foo")
+    doAssert not domi.hasClass(el, "foo")
+    doAssert domi.hasClass(el, "bar")
+    domi.toggleClass(el, "bar")
+    doAssert not domi.hasClass(el, "bar")
+    echo "PASS: classList helpers"
+
+  proc testDatasetHelper() =
+    let el = domi.createElement("div")
+    domi.setDataAttr(el, "id", "42")
+    doAssert domi.getDataAttr(el, "id") == "42"
+    domi.setDataAttr(el, "name", "test")
+    doAssert domi.getDataAttr(el, "name") == "test"
+    echo "PASS: dataset helper"
+
+  proc testRequestAnimationFrame() =
+    var called = false
+    let id = domi.requestAnimationFrame(proc(ts: float) =
+      called = true
+    )
+    doAssert id > 0
+    # Cancel immediately (no animation needed for test)
+    domi.cancelAnimationFrame(id)
+    echo "PASS: requestAnimationFrame/cancelAnimationFrame"
+
 when isMainModule:
   when defined(js):
     testRenderDomNodeBasic()
@@ -288,6 +320,9 @@ when isMainModule:
     testErrorBoundaryCatches()
     testErrorBoundaryPassThrough()
     testLazyNodeCsrShowsFallback()
+    testClassListHelpers()
+    testDatasetHelper()
+    testRequestAnimationFrame()
     echo ""
     echo "All client DOM tests passed!"
   else:

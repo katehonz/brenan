@@ -8,9 +8,11 @@ type
   Computation* = ref object of Subscriber
     execute*: proc() {.closure.}
     dependencies*: seq[SignalBase]
+    debugName*: string
 
   SignalBase* = ref object of RootObj
     subscribers: seq[Subscriber]
+    debugName*: string
 
   Signal*[T] = ref object of SignalBase
     value*: T
@@ -25,8 +27,8 @@ type
     pending: bool
     batchDepth: int
 
-when defined(js) or defined(wasm32):
-  ## JS and WASM (without pthreads) use plain globals.
+when defined(js):
+  ## JS target uses plain globals (no pthreads).
   ## Native backend uses thread-local for thread safety.
   var currentComputation: Computation
   var globalScheduler: Scheduler

@@ -9,7 +9,6 @@ srcDir        = "src"
 requires "nim >= 2.0.0"
 requires "nimmax >= 1.0.0"
 requires "jwt >= 2.1.0"
-requires "nimbling >= 0.1.0"
 
 import os
 
@@ -23,11 +22,12 @@ task test, "Run all tests":
   exec "nim c -r --threads:on -p:src tests/i18n_test.nim"
   exec "nim c -r --threads:on -p:src tests/form_test.nim"
   exec "nim c -r --threads:on -p:src tests/websocket_test.nim"
-  exec "nim c -r --threads:on -p:src tests/wasm_e2e_test.nim"
   exec "nim js -p:src tests/client_dom_test.nim"
   exec "node --require ./tests/jsdom_setup.js tests/client_dom_test.js"
   exec "nim js -p:src tests/router_test.nim"
   exec "node --require ./tests/jsdom_setup.js tests/router_test.js"
+  exec "nim js -p:src tests/client_hydration_test.nim"
+  exec "node --require ./tests/jsdom_setup.js tests/client_hydration_test.js"
 
 task example, "Run counter example":
   exec "nim c -r --threads:on -p:src examples/counter/main.nim"
@@ -53,38 +53,6 @@ task todo, "Run full-stack todo app example":
 task blog, "Build and run blog example":
   exec "nim js -p:src -o:examples/blog/public/app.js examples/blog/frontend.nim"
   exec "nim c -r --threads:on -p:src examples/blog/backend.nim"
-
-task nimblingReactive, "Compile reactive core example for nimbling WASM":
-  let outDir = "examples/nimbling_reactive"
-  let nimcache = outDir & "/nimcache"
-  echo "Building nimbling reactive counter..."
-  exec "nim c --cc:clang --cpu:wasm32 --os:standalone --mm:orc -d:wasm32 " &
-    "-p:src --compileOnly --nimcache:" & nimcache & " " &
-    outDir & "/counter.nim"
-
-  # Copy .nbg sidecar to example dir so CLI can find it
-  for file in listFiles("."):
-    if file.endsWith(".nbg"):
-      let dst = outDir & "/" & extractFilename(file)
-      cpFile(file, dst)
-      rmFile(file)
-      echo "Moved sidecar: " & file & " -> " & dst
-
-  echo ""
-  echo "C files generated in " & nimcache
-  echo ""
-  echo "Next steps:"
-  echo "  1. Link to WASM (requires WASI SDK):"
-  echo "     export WASI_SDK_PATH=/path/to/wasi-sdk"
-  echo "     clang --target=wasm32-wasi --sysroot=\\$WASI_SDK_PATH/share/wasi-sysroot"
-  echo "       -nostartfiles -O3 -Wno-implicit-function-declaration"
-  echo "       -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined -Wl,--no-gc-sections"
-  echo "       -o counter.wasm nimcache/*.c"
-  echo ""
-  echo "  2. Post-process with nimbling CLI:"
-  echo "     nimbling counter.wasm --out-dir pkg/ --target bundler"
-  echo ""
-  echo "  3. Open " & outDir & "/index.html in a browser"
 
 task bench, "Run all benchmarks":
   exec "nim c -r --threads:on -p:src benchmarks/signal_bench.nim"
@@ -115,43 +83,35 @@ task hot, "Watch src/ and recompile JS client on changes (short alias for hotCli
   exec "nim c --threads:on -p:src tools/hotreload.nim"
   exec "tools/hotreload \"nim js -p:src -o:examples/counter_client.js examples/counter_client.nim\" src examples"
 
+task routerClient, "Compile client-side router example":
+  exec "nim js -p:src -o:examples/router_client.js examples/router_client.nim"
+
+task fetchClient, "Compile client-side fetch + Resource example":
+  exec "nim js -p:src -o:examples/fetch_client.js examples/fetch_client.nim"
+
+task formClient, "Compile client-side form + validation example":
+  exec "nim js -p:src -o:examples/form_client.js examples/form_client.nim"
+
 task i18nClient, "Compile i18n client-side JS":
   exec "nim js -p:src -o:examples/i18n_client.js examples/i18n_client.nim"
+
+task dev, "Start dev server with hot reload + Vite (vite_counter example)":
+  let watcher = "tools/hotreload"
+  if not fileExists(watcher):
+    exec "nim c --threads:on -p:src " & watcher & ".nim"
+  let exampleDir = "examples/vite_counter"
+  let compileCmd = "nim js -p:src -o:" & exampleDir & "/counter.js " & exampleDir & "/counter.nim"
+  let watchDirs = "src " & exampleDir
+  # Run hotreload watcher and Vite dev server in parallel
+  exec "bash -c 'tools/hotreload \"" & compileCmd & "\" " & watchDirs & " & HOTRELOAD_PID=$!; cd " & exampleDir & " && npx vite & VITE_PID=$!; trap \"kill $HOTRELOAD_PID $VITE_PID\" INT EXIT; wait'"
+
+task bundleSize, "Measure JS bundle size for counter_client with various flags":
+  let out = "examples/counter_client"
+  exec "nim js -p:src -o:" & out & ".debug.js " & out & ".nim"
+  exec "nim js -d:release --opt:size -p:src -o:" & out & ".release.js " & out & ".nim"
+  exec "nim js -d:danger --opt:size -p:src -o:" & out & ".danger.js " & out & ".nim"
+  exec "ls -lh " & out & ".debug.js " & out & ".release.js " & out & ".danger.js | awk '{print $5, $9}'"
 
 task i18n, "Build and run i18n demo app (SSR + client-side)":
   exec "nim js -p:src -o:examples/i18n_client.js examples/i18n_client.nim"
   exec "nim c -r --threads:on -p:src examples/i18n_app.nim"
-
-task nimblingI18n, "Compile i18n example for nimbling WASM":
-  let outDir = "examples/nimbling_i18n"
-  let nimcache = outDir & "/nimcache"
-  echo "Building nimbling i18n example..."
-  exec "nim c --cc:clang --cpu:wasm32 --os:standalone --mm:orc -d:wasm32 " &
-    "-p:src --compileOnly --nimcache:" & nimcache & " " &
-    outDir & "/i18n.nim"
-
-  # Copy .nbg sidecar to example dir so CLI can find it
-  for file in listFiles("."):
-    if file.endsWith(".nbg"):
-      let dst = outDir & "/" & extractFilename(file)
-      cpFile(file, dst)
-      rmFile(file)
-      echo "Moved sidecar: " & file & " -> " & dst
-
-  echo ""
-  echo "C files generated in " & nimcache
-  echo ""
-  echo "Next steps:"
-  echo "  1. Link to WASM (requires WASI SDK or zig cc):"
-  echo "     zig cc -target wasm32-wasi-musl -nostartfiles -O3"
-  echo "       -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined"
-  echo "       -o i18n.wasm nimcache/*.c"
-  echo ""
-  echo "  2. Post-process with nimbling CLI:"
-  echo "     nimbling i18n.wasm --out-dir pkg/ --target bundler"
-  echo ""
-  echo "  3. Open " & outDir & "/index.html in a browser"
-
-task cleanWasm, "Clean WASM build artifacts":
-  exec "rm -rf examples/nimbling_reactive/nimcache examples/nimbling_counter/nimcache examples/nimbling_i18n/nimcache"
-  exec "rm -f examples/nimbling_reactive/*.nbg examples/nimbling_counter/*.nbg examples/nimbling_i18n/*.nbg"

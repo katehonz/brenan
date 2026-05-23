@@ -56,32 +56,6 @@ jobs:
       - name: Run client DOM test
         run: node --require ./tests/jsdom_setup.js tests/client_dom_test.js
 
-  test-wasm-compile:
-    name: WASM Compile Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Nim
-        uses: jiro4989/setup-nim-action@v2
-        with:
-          nim-version: '2.2.x'
-
-      - name: Install dependencies
-        run: nimble install -d --accept
-
-      - name: Check WASM compilation — reactive counter
-        run: |
-          nim c --cc:clang --cpu:wasm32 --os:standalone --mm:orc -d:wasm32 \
-            -p:src --compileOnly --nimcache:examples/nimbling_reactive/nimcache \
-            examples/nimbling_reactive/counter.nim
-
-      - name: Check WASM compilation — i18n bridge
-        run: |
-          nim c --cc:clang --cpu:wasm32 --os:standalone --mm:orc -d:wasm32 \
-            -p:src --compileOnly --nimcache:examples/nimbling_i18n/nimcache \
-            examples/nimbling_i18n/i18n.nim
-
   benchmark:
     name: Benchmarks
     runs-on: ubuntu-latest

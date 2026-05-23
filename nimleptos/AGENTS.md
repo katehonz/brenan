@@ -7,9 +7,9 @@
 - **Type:** Frontend reactive web framework (like Leptos/Solid), NOT full-stack
 - **Language:** Nim (≥ 2.0.0), not Rust
 - **Dev/Test Server:** [NimMax](https://github.com/katehonz/nimmax) — used ONLY for development server and tests
-- **WASM:** Uses [Nimbling](https://github.com/katehonz/nimbling), NOT Emscripten
+- **Client target:** `nim js` — Nim compiles directly to JavaScript for the browser
 - **Memory model:** `--mm:orc` (refc is forbidden)
-- **Threading:** Native uses `--threads:on`. WASM/JS use single-threaded globals (no `threadvar`).
+- **Threading:** Native uses `--threads:on`. JS target uses single-threaded globals (no `threadvar`).
 
 > **For AI:** Do NOT suggest full-stack backend features (databases, auth APIs, file uploads) as primary work. The framework is frontend-first. Backend code in `server/`, `routing/`, `forms/` exists only for dev/test purposes and is NOT the product.
 
@@ -19,14 +19,14 @@
 Unlike React/Solid/Leptos-Rust, NimLeptos uses an **HtmlNode tree** (server-side) and **fine-grained DOM updates** (client-side). There is NO virtual DOM diffing. Never suggest VDOM algorithms.
 
 ### 2. `threadvar` Is Conditionally Banned
-The reactive core (`subscriber.nim`) uses plain globals for JS/WASM targets:
+The reactive core (`subscriber.nim`) uses plain globals for JS target:
 ```nim
-when defined(js) or defined(wasm32):
+when defined(js):
   var currentComputation: Computation  # plain global
 else:
   var currentComputation {.threadvar.}: Computation
 ```
-**Trap:** Adding `threadvar` unconditionally will break WASM compilation.
+**Trap:** Adding `threadvar` unconditionally will break `nim js` compilation.
 
 ### 3. `createMemo` Has a Silent Dependency Bug
 The `getter()` in `createMemo` MUST wrap `memo.compute()` with `setCurrentComputation(nil)` to prevent caller-scope dependency poisoning. Generic AI always forgets this:
@@ -41,20 +41,8 @@ cachedValue = memo.compute()
 setCurrentComputation(prev)
 ```
 
-### 4. WASM DOM Is JS-Side Only
-Do NOT try to use `nimbling/web_sys` or `nimbling/js_sys` emit blocks in C→WASM backend — they contain JavaScript syntax that crashes the C compiler. WASM DOM manipulation happens entirely in the JS glue code; Nim only exports reactive state via `wasmBindgen`.
-
-### 5. `Resource[T]` Cannot Use Nested Closures in Generic Procs
+### 4. `Resource[T]` Cannot Use Nested Closures in Generic Procs
 Nim has a compiler bug where nested closures inside generic procs cause C type conflicts. `Resource` is implemented as a `ref object` with methods, NOT as a tuple of closures. Never refactor it to return closure tuples.
-
-### 6. Nimbling Workflow Is Three-Step
-Generic AI assumes `nim c` produces `.wasm` directly. It does NOT:
-1. `nim c --cpu:wasm32 --os:standalone --compileOnly` (generates C files)
-2. `zig cc -target wasm32-wasi-musl` (links C → `.wasm`)
-3. `nimbling app.wasm --out-dir pkg/` (post-processes)
-
-### 7. `panicoverride.nim` Is Required for `--os:standalone`
-Every WASM example directory MUST contain `panicoverride.nim` with empty `panic`/`rawOutput` procs. Without it, compilation fails with "cannot open file: panicoverride".
 
 ## Code Style Traps
 
@@ -79,16 +67,15 @@ Reversing `signal` and `effects` causes forward-reference issues because `effect
 
 ## Forbidden Operations
 
-1. **Never use `std/asyncdispatch` in WASM/JS targets.** Use `nimbling/js_sys` promises or JS callbacks.
-2. **Never use `std/locks` in WASM.** There are no threads.
-3. **Never use `echo` inside `createEffect` when compiling to WASM.** It blocks stdout and deadlocks Emscripten runtime (legacy) or crashes Nimbling runtime. Use `debuglog.nim` (`debugLog`, `debugWarn`, `debugError`, `debugTrace`) instead — it routes to `console.log` on JS/WASM and is gated by `-d:nimleptosDebug`.
-4. **Never use `createSignalTriple` outside internal reactive modules.** It is an internal helper; public API is `createSignal`.
+1. **Never use `std/asyncdispatch` in JS targets.** Use JS callbacks or promises.
+2. **Never use `echo` inside `createEffect` when compiling to JS.** It can block or behave unpredictably in some JS runtimes. Use `debuglog.nim` (`debugLog`, `debugWarn`, `debugError`, `debugTrace`) instead — it routes to `console.log` on JS and is gated by `-d:nimleptosDebug`.
+3. **Never use `createSignalTriple` outside internal reactive modules.** It is an internal helper; public API is `createSignal`.
 
 ## Testing Rules
 
 - Tests use `doAssert` (not `unittest` framework)
 - Test files MUST end with `when isMainModule:` guard
-- WASM tests are run via `nim js` (Node.js), NOT via browser automation
+- Client tests are run via `nim js` and executed in Node.js with jsdom
 
 ## Documentation Format
 
@@ -102,13 +89,12 @@ Reversing `signal` and `effects` causes forward-reference issues because `effect
 | Mistake | Why It Breaks |
 |---------|--------------|
 | Refactoring `Store` to use `ref Table[string, Signal[T]]` | Loses type safety; Store holds a single `Signal[T]` state value |
-| Adding `async` to `Resource` fetcher | WASM has no async runtime; fetchers must be sync closures |
+| Adding `async` to `Resource` fetcher | Client `nim js` has no async runtime; fetchers must be sync closures |
 | Using `var` for `Signal[T]` values | Signals are `ref object`; mutation must go through setter to trigger notify |
 | Suggesting React/Vue patterns | This is fine-grained signals, not component VDOM |
 | Replacing `HtmlNode` tree with Karax | Karax is VDOM; NimLeptos explicitly avoids VDOM |
-| Using `std/dom` in WASM modules | `std/dom` is JS-only; WASM uses no-op stubs or JS glue |
 | Suggesting full-stack backend code | NimLeptos is a frontend framework; backend is dev/test only |
-| Using `var` capture in `createMemo`-like patterns | WASM closure environments can't mutate captured `var`; use `ref MemoCache[T]` pattern from `effects.nim` |
+| Using `var` capture in `createMemo`-like patterns | JS closure environments can't mutate captured `var`; use `ref MemoCache[T]` pattern from `effects.nim` |
 
 ## Emergency Contacts (for AI)
 

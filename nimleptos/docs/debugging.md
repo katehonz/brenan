@@ -13,7 +13,7 @@ nim js -d:nimleptosDebug -p:src your_client.nim
 
 The `debuglog` module provides safe logging across all targets:
 
-| Function      | Native                   | JS/WASM                  |
+| Function      | Native                   | JS                       |
 |---------------|--------------------------|--------------------------|
 | `debugLog`    | `echo`                   | `console.log`            |
 | `debugWarn`   | `echo "[WARN]"`          | `console.warn`           |
@@ -48,10 +48,6 @@ When `-d:nimleptosDebug` is enabled, the reactive core logs:
 - Scheduler queue flushes
 - Batch depth transitions
 
-## Safe Logging for WASM
-
-⚠️ **Never use `echo` directly in WASM code.** It deadlocks the Emscripten runtime and crashes the Nimbling runtime. Always use `debugLog` from the `debuglog` module, which automatically routes to `console.log` on JS/WASM targets.
-
 ## Client-Side Debugging
 
 For `nim js` targets, debug messages appear in the browser's DevTools console (not stdout). Use:
@@ -59,3 +55,22 @@ For `nim js` targets, debug messages appear in the browser's DevTools console (n
 nim js -d:nimleptosDebug -p:src your_client.nim
 ```
 Then check the browser console for log output.
+
+## Debug Names
+
+Name your effects and memos for easier tracing:
+
+```nim
+import nimleptos/reactive/signal
+import nimleptos/reactive/effects
+
+let (count, _) = createSignal(0)
+
+discard createEffect(proc() =
+  echo count()
+, "countWatcher")
+
+let (doubled, _) = createMemo(proc(): int = count() * 2, "doubledMemo")
+```
+
+When `-d:nimleptosDebug` is enabled, named computations include their name in trace output.

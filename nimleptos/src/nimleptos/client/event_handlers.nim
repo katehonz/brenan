@@ -30,9 +30,13 @@ when defined(js):
       for node in nodes:
         node.addEventListener(binding.event, binding.handler)
 
+  proc clearBindings*() =
+    bindings.setLen(0)
+
   proc initEventHandlers*() =
     onDOMContentLoaded(proc() =
       discard hydrateApp()
+      clearBindings()
       applyBindings()
     )
 else:
@@ -53,6 +57,8 @@ else:
 
   proc bindInput*(selector: string, handler: EventHandler) =
     discard
+
+  proc clearBindings*() = discard
 
   proc applyBindings*() =
     discard

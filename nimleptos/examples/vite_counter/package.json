@@ -1,0 +1,13 @@
+{
+  "name": "nimleptos-vite-counter",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "nim js -p:../../src -o:counter.js counter.nim && vite build",
+    "dev": "nim js -p:../../src -o:counter.js counter.nim && vite",
+    "watch": "nim js -p:../../src -o:counter.js counter.nim && vite"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

@@ -17,16 +17,18 @@ import nimleptos/client/router
 import nimleptos/client/hydration_client
 import nimleptos/client/event_handlers
 import nimleptos/client/pwa
-import nimleptos/server/adapter
-import nimleptos/server/app
-import nimleptos/server/middleware
-import nimleptos/server/auth
-import nimleptos/routing/route
-import nimleptos/routing/layout
-import nimleptos/forms/form
-import nimleptos/forms/validation
-import nimleptos/wasm/dom_bridge
-import nimleptos/wasm/reactive_wasm
+
+when not defined(js):
+  import nimleptos/server/adapter
+  import nimleptos/server/app
+  import nimleptos/server/middleware
+  import nimleptos/server/auth
+  import nimleptos/routing/route
+  import nimleptos/routing/layout
+  import nimleptos/forms/form
+  import nimleptos/forms/validation
+  import nimleptos/realtime/ws_bridge
+  import nimleptos/realtime/ws_handler
 
 export signal
 export effects
@@ -47,13 +49,15 @@ export router
 export hydration_client
 export event_handlers
 export pwa
-export adapter
-export app
-export middleware
-export auth
-export route
-export layout
-export form
-export validation
-export dom_bridge
-export reactive_wasm
+
+when not defined(js):
+  export adapter
+  export app
+  export middleware
+  export auth
+  export route
+  export layout
+  export form
+  export validation
+  export ws_bridge
+  export ws_handler

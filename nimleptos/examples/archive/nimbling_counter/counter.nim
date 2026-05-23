@@ -12,7 +12,7 @@
 import nimbling
 import nimleptos/reactive/signal
 import nimleptos/reactive/effects
-import nimleptos/wasm/dom_bridge
+import nimleptos/_archive/wasm/dom_bridge
 
 # ─── Reactive State ───
 

@@ -6,9 +6,16 @@ tests/all_test
 tests/server_test
 examples/counter/main
 examples/counter_client.js
+examples/counter_client.danger.js
+examples/counter_client.min.js
+examples/counter_client.min.js.map
 examples/timer_client.js
 examples/hybrid_client.js
 examples/conditional_client.js
+examples/router_client.js
+examples/fetch_client.js
+examples/form_client.js
+examples/i18n_client.js
 examples/server_app
 examples/server_app.exe
 
@@ -53,21 +60,26 @@ src/nimleptos/routing/route
 src/nimleptos/server/adapter
 src/nimleptos/server/app
 src/nimleptos/server/auth
-src/nimleptos/wasm/*.js
-src/nimleptos/wasm/*.wasm
+src/nimleptos/_archive/wasm/*.js
+src/nimleptos/_archive/wasm/*.wasm
 
 # Nimbling build artifacts
 *.nbg
-examples/nimbling_reactive/pkg/
-examples/nimbling_counter/pkg/
+examples/archive/nimbling_reactive/pkg/
+examples/archive/nimbling_counter/pkg/
+examples/archive/nimbling_i18n/pkg/
 
 # Additional build artifacts
 src/nimleptos.out
 src/nimleptos/client/reactive_dom.js
-src/nimleptos/wasm/dom_bridge
-src/nimleptos/wasm/reactive_wasm
-src/nimleptos/wasm/render
+src/nimleptos/_archive/wasm/dom_bridge
+src/nimleptos/_archive/wasm/reactive_wasm
+src/nimleptos/_archive/wasm/render
 tests/*_test.js
+
+# Vite example build artifacts
+examples/vite_counter/counter.js
+examples/vite_counter/counter.min.js
 
 # Node.js dependencies (jsdom for client DOM tests)
 node_modules/

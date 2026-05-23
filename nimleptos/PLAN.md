@@ -6,7 +6,7 @@ Phase 10 добави reactive DOM binding за client-side rendering и под�
 Phase 11 добави WebAssembly компилация на reactive core с JS interop.
 Phase 11.1 оправи 3 критични бъга + 7 средни приоритета + добави 19 нови HTML елемента.
 Phase 12 добави Context, Store и Resource reactive примитиви.
-Phase 13 преработи WASM поддръжката за чисто Nimbling (без Emscripten) — reactive core се експортира чрез wasmBindgen, DOM е от JS страна.
+Phase 13 преработи WASM поддръжката за чисто Nimbling (без Emscripten) — **ARCHIVED**. WASM модулите са преместени в `src/nimleptos/_archive/wasm/`. Проектът вече фокусира client-side усилията върху `nim js` target.
 Phase 13.2: Fixed P0.1 createMemo closure bug — refactored `var cachedValue` to `ref MemoCache[T]` for WASM compatibility.
 Phase 13.3: Debug logging module added (`src/nimleptos/debuglog.nim`) — safe console.log for JS, echo for native, all gated by `-d:nimleptosDebug`.
 Phase 14: Performance benchmarks created — signal throughput, DOM render, SSR render in `benchmarks/`.
@@ -21,7 +21,7 @@ Phase 16: i18n core implemented — `src/nimleptos/i18n/` (5 модула: catal
   - Interpolation с placeholder-и `{name}`
   - Locale detection middleware (URL prefix, Cookie, Accept-Language)
   - **16.5 DONE:** `buildHtml(cfg)` i18n macro — `t"hello"`, `tp"hello"`, compile-time key validation via `registerI18nCatalog`
-  - **16.7 DONE:** WASM i18n bridge — `src/nimleptos/wasm/i18n_wasm.nim` exports `initI18n`, `setLocale`, `getLocale`, `translate`, `translateWithParams`, `registerOnLocaleChange` via `wasmBindgen`. JS side loads catalog via `addTranslation()` calls and drives DOM updates on locale change.
+  - **16.7 DONE (ARCHIVED):** WASM i18n bridge — преместен в `src/nimleptos/_archive/wasm/i18n_wasm.nim`. Вече не се поддържа активно; ползвай `nim js` target за client-side i18n.
 
 Router tests added: `tests/router_test.nim` — 10 tests (hash route, navigate, initHashRouter, routeParam edge cases).
 i18n tests added: `tests/i18n_test.nim` — 18 tests (catalog, plural, interpolate, reactive t(), setLocale/useLocale).
@@ -33,7 +33,7 @@ Phase 17.2: `for` macro in `buildHtml` — `listNode` type, reactive list render
 
 ---
 
-## WASM i18n Bridge (`src/nimleptos/wasm/i18n_wasm.nim`)
+## WASM i18n Bridge (ARCHIVED — `src/nimleptos/_archive/wasm/i18n_wasm.nim`)
 
 Exports i18n functionality via `wasmBindgen` for Nimbling workflow:
 - `initI18n(defaultLocale, fallbackLocale)` — initialize empty catalog
@@ -43,8 +43,8 @@ Exports i18n functionality via `wasmBindgen` for Nimbling workflow:
 - `registerOnLocaleChange(callback)` / `unregisterOnLocaleChange(callback)` — JS callbacks on locale change
 - `getAvailableLocales()` / `getDefaultLocale()` / `getFallbackLocale()` — catalog introspection
 
-Example: `examples/nimbling_i18n/` — HTML/JS glue demo with locale switcher and interpolated translations.
-Build: `nimble nimblingI18n` (compile-only, requires Zig/WASI + nimbling CLI for full pipeline).
+Example: `examples/archive/nimbling_i18n/` — архивиран HTML/JS glue demo. Вече не е наличен като nimble task.
+Build: ръчно, с инсталиран `nimbling` и WASI SDK/Zig (виж `WASM.md`).
 
 ---
 
@@ -122,7 +122,7 @@ Build: `nimble nimblingI18n` (compile-only, requires Zig/WASI + nimbling CLI for
 | `http_client.nim` | fetch wrapper за GET/POST JSON заявки |
 | `router.nim` | Hash-based client-side router с reactive route signal |
 
-### WASM (`src/nimleptos/wasm/`)
+### WASM (ARCHIVED — `src/nimleptos/_archive/wasm/`)
 | Файл | Описание |
 |------|----------|
 | `dom_bridge.nim` | Placeholder stubs for WASM DOM (DOM handled by JS glue when using Nimbling) |
@@ -162,7 +162,7 @@ Build: `nimble nimblingI18n` (compile-only, requires Zig/WASI + nimbling CLI for
 | `examples/conditional_client.nim` | Reactive if/else в buildHtml macro |
 | `examples/server_app.nim` | NimMax server с NimLeptos rendering, routing, API endpoints |
 | `examples/wasm_reactive.nim` | Reactive core в WASM (legacy Emscripten) |
-| `examples/nimbling_reactive/` | Reactive core в WASM чрез Nimbling — signals + effects, JS контролира DOM |
+| `examples/archive/nimbling_reactive/` | Архивиран — Reactive core в WASM чрез Nimbling |
 | `examples/todo_app.nim` | Full-stack Todo App — SSR + forms + validation + REST API |
 | `examples/blog/` | Blog App — NimMax REST API + NimLeptos CSR + hash router + fetch client |
 | `examples/i18n_app.nim` | i18n Demo — SSR с Accept-Language detection + client-side language switcher + pluralization |

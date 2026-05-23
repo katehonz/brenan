@@ -24,12 +24,11 @@
 | Transitions / Animations | ✅ Стабилен | animateNode + createTransition, CSS-based |
 | PWA / Service Worker | ✅ Стабилен | manifest.json + SW template + client registration |
 | WebSocket Realtime Signals | ⚠️ Базов | ServerSignal + broadcast, но няма reconnect logic |
-| WASM (Nimbling) | ⚠️ Експериментален | reactive core се export-ва, DOM е JS-side |
-| WASM (nimbling) | ✅ Поддържа се | WASI SDK + nimbling CLI |
+| WASM (Nimbling) | ❌ Archived | Модулите са в `src/nimleptos/_archive/wasm/`; проектът фокусира върху `nim js` |
 | Performance Benchmarks | ❌ Липсват | няма сравнение с Karax, HappyX, Solid |
 | CI/CD | ❌ Липсва | ръчно пускане на `nimble test` |
 | Developer Tools / Debug | ❌ Липсват | няма DevTools extension или debug utils |
-| i18n / Localization | ✅ Стабилен | reactive t() + SSR + WASM bridge, 18 теста |
+| i18n / Localization | ✅ Стабилен | reactive t() + SSR, 18 теста |
 
 ---
 
@@ -37,17 +36,18 @@
 
 | # | Проблем | Файл(ове) | Статус | Как да се оправи |
 |---|---------|-----------|--------|------------------|
-| P0.1 | `createMemo` closure bug в WASM | `reactive/effects.nim` | ✅ Fixed | `Cache[T]` ref object вместо `var` capture (`f6a3b71`) |
-| P0.2 | Nimbling emit blocks — неизвестен статус | `wasm/` stubs | ⚠️ Nimbling CLI не е инсталиран в CI | Nimbling пакетът съществува, compileOnly минава; линкване + post-process изисква Nimbling CLI |
-| P0.3 | `echo` в `createEffect` deadlock/crash в WASM | `AGENTS.md` забранява | ✅ Mitigated | `debuglog.nim` — safe console.log за JS, echo за native, gated by `-d:nimleptosDebug` |
-| P0.4 | Липсва e2e WASM тест | `tests/` | ⚠️ compileOnly check в CI | Пълен e2e тест изисква `zig cc` за линкване + Nimbling CLI за post-process (не е в CI) |
+| P0.1 | `createMemo` closure bug в WASM | `reactive/effects.nim` | ✅ Fixed (deprecated) | `Cache[T]` ref object вместо `var` capture. WASM target е архивиран. |
+| P0.2 | Nimbling emit blocks — неизвестен статус | `wasm/` stubs | ❌ Archived | WASM поддръжката е премахната от активна разработка |
+| P0.3 | `echo` в `createEffect` deadlock/crash в WASM | `AGENTS.md` забранява | ✅ Mitigated (deprecated) | `debuglog.nim` — safe console.log за JS, echo за native. WASM target е архивиран. |
+| P0.4 | Липсва e2e WASM тест | `tests/` | ❌ Archived | WASM тестовете са преместени в `tests/archive/` |
 
 ---
 
 ## 3. Пътна Карта по Фази
 
-### Фаза 13: WASM Стабилизация (Q2 2026)
-**Цел:** Reactive core в WASM да е production-ready чрез Nimbling.
+### Фаза 13: WASM Стабилизация (Q2 2026) — ARCHIVED
+**Цел беше:** Reactive core в WASM да е production-ready чрез Nimbling.
+**Статус:** Фазата е архивирана. Проектът премина към `nim js` target за client-side rendering.
 
 - [x] **13.1** Определи дали Nimbling emit-extraction работи коректно
   - Проверен: Nimbling пакетът (v0.1.0) съществува, но CLI не е инсталиран на dev машината
@@ -55,12 +55,10 @@
   - Пълен e2e pipeline изиксва Zig за linking + Nimbling CLI за post-processing
 - [x] **13.2** Рефакторирай `createMemo` за WASM съвместимост
   - ✅ Fixed: `var cachedValue` capture заменен с `ref MemoCache[T]` (heap-allocated)
-  - Всички 69 теста PASS
 - [x] **13.3** Напиши `wasm_e2e_test.nim`
-  - compileOnly проверка: `nim c --cc:clang --cpu:wasm32 --os:standalone --mm:orc --compileOnly` минава
-  - Пълен WASM тест добавен в CI/CD pipeline-а
-- [x] **13.4** Документирай WASM workflow в `docs/wasm.md`
-  - ✅ WASM.md вече съдържа пълния workflow (Nim → C → WASM → Nimbling → JS glue)
+  - ✅ compileOnly проверка минаваше; тестът е архивиран в `tests/archive/`
+- [x] **13.4** Документирай WASM workflow в `WASM.md`
+  - ✅ WASM.md е архивиран с ясна бележка в началото
 
 ### Фаза 14: Performance & Benchmarks (Q2 2026)
 **Цел:** Да знаем колко е бърз NimLeptos спрямо алтернативите.
@@ -139,12 +137,12 @@ src/nimleptos/i18n/
   - ✅ `resolvePlural(locale, n)` — EN, BG, RU, AR, FR правила
   - ✅ `parsePluralMessage(raw)` — parse-ва ICU plural string
 
-#### WASM част
+#### WASM част (ARCHIVED)
 - [x] **16.7** WASM i18n bridge
-  - ✅ `src/nimleptos/wasm/i18n_wasm.nim` — exports `initI18n`, `setLocale`, `getLocale`, `translate`, `translateWithParams`, `registerOnLocaleChange` via `wasmBindgen`
+  - ✅ `src/nimleptos/_archive/wasm/i18n_wasm.nim` — exports `initI18n`, `setLocale`, `getLocale`, `translate`, `translateWithParams`, `registerOnLocaleChange` via `wasmBindgen`
   - ✅ JS side loads catalog via `addTranslation()` calls, registers `onLocaleChange` callback, drives DOM text updates
-  - ✅ `examples/nimbling_i18n/` — full HTML/JS glue demo with locale switcher
-  - ✅ Compile-only check passes in CI (`nimble nimblingI18n`)
+  - ✅ `examples/archive/nimbling_i18n/` — archived HTML/JS glue demo with locale switcher
+  - ❌ Compile-only check премахнат от CI; nimble tasks `nimblingI18n` и `nimblingReactive` са изтрити
 
 #### Интеграция
 - [x] **16.8** `examples/i18n_app.nim`

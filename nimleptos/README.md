@@ -25,7 +25,7 @@ A full-stack reactive web framework for Nim, inspired by [Leptos](https://leptos
 - **Context** — Dependency injection for reactive components (key/value provider/consumer)
 - **Store** — Global reactive state container with selectors and slices
 - **Resource** — Async reactive primitive with loading/error/value states and auto-refetch
-- **i18n / Localization** — Reactive translations with ICU pluralization, interpolation, SSR middleware, and WASM bridge
+- **i18n / Localization** — Reactive translations with ICU pluralization, interpolation, SSR middleware
 
 ## Quick Start
 
@@ -67,15 +67,14 @@ nim c -r --threads:on -p:src myapp.nim
 # Server starts on http://0.0.0.0:8080
 ```
 
-## Multi-Target Compilation
+## Build Targets
 
-NimLeptos reactive core compiles to three targets:
+NimLeptos compiles to two primary targets:
 
 | Target | Command | Use Case |
 |--------|---------|----------|
 | **Native** | `nim c --threads:on -p:src` | Server-side rendering, full-stack |
 | **JavaScript** | `nim js -p:src` | Client-side rendering in the browser |
-| **WASM** | `nim c --cpu:wasm32 --mm:arc ...` | High-performance reactive core in the browser |
 
 ### Native (default)
 ```bash
@@ -88,17 +87,24 @@ nim js -p:src -o:app.js app.nim
 # Reactive signals, effects, and DOM updates work in the browser
 ```
 
-### WebAssembly (WASM)
+#### Bundler Integration (Vite)
 
-**With Nimbling** (recommended):
+You can bundle NimLeptos client apps with Vite for a modern dev experience:
+
 ```bash
-nimble nimbling_reactive
-# Follow the printed instructions to link with Zig/WASI and post-process
+cd examples/vite_counter
+npm install
+nimble dev    # or: ./tools/dev.sh examples/vite_counter
+# Opens http://localhost:5173 with hot reload
 ```
 
-The reactive core (`signal`, `effects`, `context`, `store`, `resource`) is fully portable across all three targets. Platform-specific DOM bindings are provided by:
-- `client/reactive_dom.nim` — for `nim js`
-- `wasm/reactive_wasm.nim` — WASM stub (DOM is handled by JS glue when using Nimbling)
+For production:
+```bash
+nim js -d:release --opt:size -p:src -o:dist/app.js app.nim
+npm run build
+```
+
+The reactive core (`signal`, `effects`, `context`, `store`, `resource`) works on both targets. Platform-specific DOM bindings are provided by `client/reactive_dom.nim` for `nim js`.
 
 ## Reactivity
 
@@ -239,91 +245,6 @@ app.post("/register", proc(ctx: Context) {.async.} =
   ctx.redirect("/welcome")
 )
 ```
-
-## WebAssembly (WASM) — Nimbling Edition
-
-Compile the reactive core to WebAssembly for high-performance signal computation in the browser, controlled from JavaScript via [Nimbling](https://github.com/katehonz/nimbling):
-
-### Reactive Counter Example
-
-```nim
-# examples/nimbling_reactive/counter.nim
-import nimbling
-import nimleptos/reactive/signal
-import nimleptos/reactive/effects
-
-let (count, setCount) = createSignal(0)
-let (doubled, _) = createMemo(proc(): int = count() * 2)
-
-proc increment() {.wasmBindgen.} = setCount(count() + 1)
-proc decrement() {.wasmBindgen.} = setCount(count() - 1)
-proc getCount(): int32 {.wasmBindgen.} = count().int32
-proc getDoubled(): int32 {.wasmBindgen.} = doubled().int32
-
-wasmBindgenFinalize()
-```
-
-Build with Nimbling:
-
-```bash
-nimble nimbling_reactive
-# Then link with Zig/WASI and post-process with nimbling CLI
-```
-
-Use from JavaScript:
-
-```javascript
-import initWasm from './pkg/counter.js';
-const wasm = await initWasm();
-
-wasm.increment();
-console.log(wasm.getCount());      // 1
-console.log(wasm.getDoubled());    // 2
-```
-
-Open `examples/nimbling_reactive/index.html` in a browser to see the interactive demo.
-
-### WASM i18n Bridge
-
-Translate in WASM with locale change callbacks to JS:
-
-```nim
-# examples/nimbling_i18n/i18n.nim
-import nimleptos/wasm/i18n_wasm  # exports initI18n, setLocale, translate, etc.
-```
-
-```bash
-nimble nimblingI18n
-```
-
-```javascript
-import initWasm from './pkg/i18n.js';
-const wasm = await initWasm();
-
-wasm.initI18n('en', 'en');
-wasm.addTranslation('en', 'hello', 'Hello');
-wasm.addTranslation('bg', 'hello', 'Здравей');
-
-wasm.registerOnLocaleChange(() => {
-  document.querySelectorAll('[data-i18n-key]').forEach(el => {
-    el.textContent = wasm.translate(el.dataset.i18nKey);
-  });
-});
-
-wasm.setLocale('bg');  // DOM updates via JS callback
-```
-
-Open `examples/nimbling_i18n/index.html` for a full demo with locale switcher and interpolated translations.
-
-### WASM Architecture
-
-| Layer | Technology | Role |
-|-------|-----------|------|
-| Reactive Core | Nim → WASM (nimbling) | Signals, effects, memos |
-| JS Bridge | Nimbling `wasmBindgen` | Type-safe JS ↔ Wasm interop |
-| DOM | Plain JS | Render and event handling |
-
-> **Note:** Avoid `echo` inside `createEffect` when compiling to WASM — it can block stdout and cause deadlock in the Emscripten runtime. Use JS-side logging instead.
 
 ## Full-Stack Example: Todo App
 
@@ -505,7 +426,7 @@ nimleptos/
 │   ├── forms/             # Form handling, validation
 │   ├── realtime/          # WebSocket signals (thread-safe)
 │   └── client/            # JS hydration, reactive DOM, router, HTTP
-├── tests/                 # 152 tests across 12 suites
+├── tests/                 # 150+ tests across 11 suites
 ├── examples/
 ├── docs/
 └── nimleptos.nimble
@@ -524,15 +445,15 @@ nimleptos/
 | [Client Hydration](docs/client.md) | JS compilation, event binding |
 | [WebSocket Realtime](docs/realtime.md) | Server signals, live updates |
 | [JWT Authentication](docs/auth.md) | Bearer tokens, login/refresh, role-based access |
-| [i18n & Localization](docs/i18n.md) | Reactive translations, ICU pluralization, SSR middleware, WASM bridge |
+| [i18n & Localization](docs/i18n.md) | Reactive translations, ICU pluralization, SSR middleware |
 | [Component System](docs/components.md) | View macros, slots, typed props |
-| [Debugging](docs/debugging.md) | Debug logging across native/JS/WASM targets |
+| [Debugging](docs/debugging.md) | Debug logging across native and JS targets |
 | [Benchmarks](docs/benchmarks.md) | Signal, DOM, and SSR performance tests |
 
 ## Testing
 
 ```bash
-nimble test   # 152 tests across 12 suites
+nimble test   # 150+ tests across 11 suites
 ```
 
 ## Examples
@@ -565,8 +486,8 @@ nimble todo
 # i18n Demo (SSR + client-side language switcher)
 nimble i18n
 
-# Reactive core to WASM (requires Nimbling + Zig/WASI)
-nimble nimbling_reactive
+# Vite + hot reload dev server (nim js + Vite bundler)
+nimble dev
 ```
 
 ## Comparison with Leptos (Rust)
@@ -582,7 +503,7 @@ nimble nimbling_reactive
 | Context | `use_context` / `provide_context` | `useContext` / `provideContext` |
 | Store | `Store` | `Store[T]` with selectors & slices |
 | Resource | `Resource` | `Resource[T]` with auto-refetch |
-| Compilation | WASM + Native | Native (server) + JS (client) + WASM (core) |
+| Compilation | WASM + Native | Native (server) + JS (client) |
 | Macros | `view!` | `buildHtml`, `el()`, `view` with reactive interpolation & events |
 | Hydration | WASM-based | `nim js` + `data-nl-id` |
 

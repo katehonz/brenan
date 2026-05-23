@@ -15,6 +15,18 @@ global.Node = dom.window.Node;
 global.Element = dom.window.Element;
 global.HTMLElement = dom.window.HTMLElement;
 
+// Polyfill requestAnimationFrame for DOM interop tests
+if (!global.window.requestAnimationFrame) {
+  global.window.requestAnimationFrame = function(callback) {
+    return setTimeout(function() { callback(Date.now()); }, 16);
+  };
+  global.window.cancelAnimationFrame = function(id) {
+    clearTimeout(id);
+  };
+}
+global.requestAnimationFrame = global.window.requestAnimationFrame;
+global.cancelAnimationFrame = global.window.cancelAnimationFrame;
+
 // Polyfill PopStateEvent for router tests (jsdom doesn't include it)
 if (!global.PopStateEvent) {
   global.PopStateEvent = class PopStateEvent extends global.window.Event {
